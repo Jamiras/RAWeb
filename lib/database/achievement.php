@@ -747,6 +747,11 @@ function GetPatchData($gameID, $flags, $user)
 
         $retVal['Achievements'] = GetAchievementsPatch($gameID, $flags);
         $retVal['Leaderboards'] = GetLBPatch($gameID);
+
+        $retVal['Hashes'] = [];
+        foreach (getHashListByGameID($gameID) as $entry) {
+            array_push($retVal['Hashes'], $entry['hash']);
+        }
     }
     return $retVal;
 }
