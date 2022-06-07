@@ -249,7 +249,7 @@ function RenderRecentGamePlayers($recentPlayerData): void
     echo "</div>";
 }
 
-function RenderGameHeader(array $gameData, string $selectedTab): void
+function RenderGameHeader(array $gameData, string $selectedTab, string $editLink=null): void
 {
     $pageTitle = $gameData['Title'] . ' (' . $gameData['ConsoleName'] .')';
     $gameID = $gameData['ID'];
@@ -272,8 +272,14 @@ function RenderGameHeader(array $gameData, string $selectedTab): void
         }
         ?>
     </div>
-    <div style='margin-left: 106px; position: absolute; bottom:0; left: 106'>
-        <?php RenderPageTabs([
+    <div style='margin-left: 106px; position: absolute; bottom:0; left: 106; width:88%'>
+        <?php
+        if (!empty($editLink)) {
+            echo "<div style='float:right'>";
+            echo "<button class='scores' style='padding: 5px 8px' onclick='location.href=\"$editLink\";'>Edit</button>";
+            echo "</div>";
+        }
+        RenderPageTabs([
             'Overview' => "/v1.5/game/index.php?ID=$gameID",
             'Achievements' => "/v1.5/game/achievements.php?ID=$gameID",
             'Leaderboards' => "/v1.5/game/leaderboards.php?ID=$gameID",

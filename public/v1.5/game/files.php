@@ -15,6 +15,11 @@ if ($gameID == null || $gameID == 0) {
 
 authenticateFromCookie($user, $permissions, $userDetails);
 
+$editLink = '';
+if ($permissions >= Permissions::JuniorDeveloper) {
+    $editLink = "/managehashes.php?g=$gameID";
+}
+
 $gameData = getGameData($gameID);
 $hashes = getHashListByGameID($gameID);
 
@@ -38,7 +43,7 @@ RenderHtmlStart(true);
 <?php RenderHeader($userDetails); ?>
 <div id="mainpage">
     <div id="fullcontainer">
-        <?php RenderGameHeader($gameData, 'Files'); ?>
+        <?php RenderGameHeader($gameData, 'Files', $editLink); ?>
         <?php if ($permissions >= Permissions::Registered) { ?>
             <div style='margin-top: 4px'>
                 <div style='float: left; margin-right:4px'>
