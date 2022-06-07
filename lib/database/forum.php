@@ -107,6 +107,34 @@ function getForumTopics($forumID, $offset, $count, $permissions, &$maxCountOut):
     }
 }
 
+function getTopicSummaries(array $topicIDs, int $permissions): ?array
+{
+    $query = "  SELECT f.Title AS ForumTitle, ft.ID AS ForumTopicID, ft.Title AS TopicTitle, LEFT( ftc2.Payload, 54 ) AS TopicPreview, ft.Author, ft.AuthorID, ft.DateCreated AS ForumTopicPostedDate, ftc.ID AS LatestCommentID, ftc.Author AS LatestCommentAuthor, ftc.AuthorID AS LatestCommentAuthorID, ftc.DateCreated AS LatestCommentPostedDate, (COUNT(ftc2.ID)-1) AS NumTopicReplies
+                FROM ForumTopic AS ft
+                LEFT JOIN ForumTopicComment AS ftc ON ftc.ID = ft.LatestCommentID
+                LEFT JOIN Forum AS f ON f.ID = ft.ForumID
+                LEFT JOIN ForumTopicComment AS ftc2 ON ftc2.ForumTopicID = ft.ID AND ftc2.Authorised = 1
+                WHERE ft.ID IN (" . implode(',', $topicIDs) .")
+                AND ft.RequiredPermissions <= $permissions
+                GROUP BY ft.ID, LatestCommentPostedDate
+                ORDER BY LatestCommentPostedDate DESC";
+
+    $dbResult = s_mysql_query($query);
+    if ($dbResult !== false) {
+        $dataOut = [];
+
+        while ($db_entry = mysqli_fetch_assoc($dbResult)) {
+            if ($db_entry['NumTopicReplies'] != -1) {
+                $dataOut[] = $db_entry;
+            }
+        }
+        return $dataOut;
+    } else {
+        log_sql_fail();
+        return null;
+    }
+}
+
 function getUnauthorisedForumLinks(): ?array
 {
     $query = "  SELECT f.Title AS ForumTitle, ft.ID AS ForumTopicID, ft.Title AS TopicTitle, LEFT( ftc2.Payload, 60 ) AS TopicPreview, ft.Author, ft.AuthorID, ft.DateCreated AS ForumTopicPostedDate, ftc.ID AS LatestCommentID, ftc.Author AS LatestCommentAuthor, ftc.AuthorID AS LatestCommentAuthorID, ftc.DateCreated AS LatestCommentPostedDate, (COUNT(ftc2.ID)-1) AS NumTopicReplies
