@@ -279,7 +279,7 @@ function RenderGameHeader(array $gameData, string $selectedTab): void
             'Leaderboards' => "/v1.5/game/leaderboards.php?ID=$gameID",
             'Files' => "/v1.5/game/files.php?ID=$gameID",
             'Players' => "/v1.5/game/players.php?ID=$gameID",
-            'Related' => "/v1.5/ame/related.php?ID=$gameID",
+            'Related' => "/v1.5/game/related.php?ID=$gameID",
             'Community' => "/v1.5/game/community.php?ID=$gameID",
         ], $selectedTab) ?>
     </div>
