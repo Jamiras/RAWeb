@@ -41,6 +41,8 @@ foreach ($relatedGames as $gameAlt) {
     }
 }
 
+$isFullyFeaturedGame = ($gameData['ConsoleID'] < 100);
+
 $gameRating = getGameRating($gameID, $user);
 $minimumNumberOfRatingsToDisplay = 5;
 $renderRatingControl = function ($label, $containername, $labelname, $ratingData) use ($minimumNumberOfRatingsToDisplay) {
@@ -120,6 +122,7 @@ RenderHtmlStart(true);
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
+<?php if ($isFullyFeaturedGame) { ?>
 <script>
 var lastKnownAchRating = <?= $gameRating[RatingType::Achievement]['AverageRating'] ?>;
 var lastKnownGameRating = <?= $gameRating[RatingType::Game]['AverageRating'] ?>;
@@ -292,22 +295,25 @@ $(function () {
 
 });
 </script>
+<?php } /* isFullyFeaturedGame */ ?>
 <div id="mainpage">
     <div id="fullcontainer">
         <?php RenderGameHeader($gameData, 'Overview'); ?>
         <div style='margin-top: 4px'>
-            <div style='float: right'>
-                <img src='<?= $gameData['ImageBoxArt'] ?>' style='max-width: 256px'/>
-            </div>
-            <div style='overflow: hidden'>
-            <?php
-            RenderPageStatistic('Achievements', $numAchievements);
-            RenderPageStatistic('Points', $numPoints);
-            RenderPageStatistic('Leaderboards', $numLeaderboards);
-            RenderPageStatistic('Players', $gameData['NumDistinctPlayersCasual']);
-            $renderRatingControl('Game Rating', 'ratinggame', 'ratinggamelabel', $gameRating[RatingType::Game]);
-            ?>
-            </div>
+            <?php if ($isFullyFeaturedGame) { ?>
+                <div style='float: right'>
+                    <img src='<?= $gameData['ImageBoxArt'] ?>' style='max-width: 256px'/>
+                </div>
+                <div style='overflow: hidden'>
+                <?php
+                RenderPageStatistic('Achievements', $numAchievements);
+                RenderPageStatistic('Points', $numPoints);
+                RenderPageStatistic('Leaderboards', $numLeaderboards);
+                RenderPageStatistic('Players', $gameData['NumDistinctPlayersCasual']);
+                $renderRatingControl('Game Rating', 'ratinggame', 'ratinggamelabel', $gameRating[RatingType::Game]);
+                ?>
+                </div>
+            <?php } /* isFullyFeaturedGame */ ?>
             <div style='margin-top:10px; margin-right:266px; overflow: hidden'>
                 <table class='gameinfo'><tbody>
                 <tr><td>System:</td><td><b><a href='/gameList.php?c=<?= $gameData['ConsoleID'] ?>'><?= $gameData['ConsoleName'] ?></a></b></td></tr>
@@ -319,14 +325,16 @@ $(function () {
                 ?>
                 </tbody></table>
             </div>
-            <div class='gamescreenshots' style='margin-top: 20px; margin-right:266px; width=100%'>
-                <div style='float:left; width:50%'>
-                    <img src='<?= $gameData['ImageTitle'] ?>' style='max-width:<?= $screenshotWidth ?>px;max-height:<?= $screenshotMaxHeight ?>px;margin-left:auto;margin-right:auto;display:block' alt='Title Screenshot'>
+            <?php if ($isFullyFeaturedGame) { ?>
+                <div class='gamescreenshots' style='margin-top: 20px; margin-right:266px; width=100%'>
+                    <div style='float:left; width:50%'>
+                        <img src='<?= $gameData['ImageTitle'] ?>' style='max-width:<?= $screenshotWidth ?>px;max-height:<?= $screenshotMaxHeight ?>px;margin-left:auto;margin-right:auto;display:block' alt='Title Screenshot'>
+                    </div>
+                    <div style='float:left; width:50%'>
+                        <img src='<?= $gameData['ImageIngame'] ?>' style='max-width:<?= $screenshotWidth ?>px;max-height:<?= $screenshotMaxHeight ?>px;margin-left:auto;margin-right:auto;display:block' alt='In-game Screenshot'>
+                    </div>
                 </div>
-                <div style='float:left; width:50%'>
-                    <img src='<?= $gameData['ImageIngame'] ?>' style='max-width:<?= $screenshotWidth ?>px;max-height:<?= $screenshotMaxHeight ?>px;margin-left:auto;margin-right:auto;display:block' alt='In-game Screenshot'>
-                </div>
-            </div>
+            <?php } /* isFullyFeaturedGame */ ?>
         </div>
     </div>
 </div>

@@ -279,7 +279,8 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
             echo "<button class='scores' style='padding: 5px 8px' onclick='location.href=\"$editLink\";'>Edit</button>";
             echo "</div>";
         }
-        RenderPageTabs([
+
+        $tabs = [
             'Overview' => "/v1.5/game/index.php?ID=$gameID",
             'Achievements' => "/v1.5/game/achievements.php?ID=$gameID",
             'Leaderboards' => "/v1.5/game/leaderboards.php?ID=$gameID",
@@ -287,7 +288,20 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
             'Players' => "/v1.5/game/players.php?ID=$gameID",
             'Related' => "/v1.5/game/related.php?ID=$gameID",
             'Community' => "/v1.5/game/community.php?ID=$gameID",
-        ], $selectedTab) ?>
+        ];
+
+        if ($gameData['ConsoleID'] == 100) {
+            // achievements and players are visible for Events
+            unset($tabs['Achievements']);
+            unset($tabs['Players']);
+        }
+
+        if ($gameData['ConsoleID'] >= 100) {
+            unset($tabs['Leaderboards']);
+            unset($tabs['Files']);
+        }
+
+        RenderPageTabs($tabs, $selectedTab) ?>
     </div>
 </div>
 <?php
