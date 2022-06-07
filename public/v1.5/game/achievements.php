@@ -89,6 +89,38 @@ RenderHtmlStart(true);
                     echo "<br>";
 
                     if ($user !== null && $numAchievements > 0) {
+                        $pctAwardedCasual = 0;
+                        $pctAwardedHardcore = 0;
+                        $pctComplete = 0;
+
+                        if ($numAchievements) {
+                            $pctAwardedCasual = $numEarnedCasual / $numAchievements;
+                            $pctAwardedHardcore = $numEarnedHardcore / $numAchievements;
+                            $pctAwardedHardcoreProportion = 0;
+                            if ($numEarnedHardcore > 0) {
+                                $pctAwardedHardcoreProportion = $numEarnedHardcore / $numEarnedCasual;
+                            }
+
+                            $pctAwardedCasual = sprintf("%01.0f", $pctAwardedCasual * 100.0);
+                            $pctAwardedHardcore = sprintf("%01.0f", $pctAwardedHardcoreProportion * 100.0);
+
+                            $pctComplete = sprintf(
+                                "%01.0f",
+                                (($numEarnedCasual + $numEarnedHardcore) * 100.0 / $numAchievements)
+                            );
+                        }
+
+                        echo "<div class='progressbar'>";
+                        echo "<div class='completion' style='width:$pctAwardedCasual%'>";
+                        echo "<div class='completionhardcore' style='width:$pctAwardedHardcore%'>&nbsp;</div>";
+                        echo "</div>";
+                        if ($pctComplete > 100.0) {
+                            echo "<b>$pctComplete%</b> complete<br>";
+                        } else {
+                            echo "$pctComplete% complete<br>";
+                        }
+                        echo "</div>";
+
                         echo "<a href='/user/$user'>$user</a> has won <b>$numEarnedCasual</b> achievements";
                         if ($totalEarnedCasual > 0) {
                             echo ", worth <b>$totalEarnedCasual</b> <span class='TrueRatio'>($totalEarnedTrueRatio)</span> points";
