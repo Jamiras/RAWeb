@@ -281,13 +281,13 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
         }
 
         $tabs = [
-            'Overview' => "/v1.5/game/index.php?ID=$gameID",
-            'Achievements' => "/v1.5/game/achievements.php?ID=$gameID",
-            'Leaderboards' => "/v1.5/game/leaderboards.php?ID=$gameID",
-            'Files' => "/v1.5/game/files.php?ID=$gameID",
-            'Players' => "/v1.5/game/players.php?ID=$gameID",
-            'Related' => "/v1.5/game/related.php?ID=$gameID",
-            'Community' => "/v1.5/game/community.php?ID=$gameID",
+            'Overview' => "/game/$gameID/overview",
+            'Achievements' => "/game/$gameID/achievements",
+            'Leaderboards' => "/game/$gameID/leaderboards",
+            'Files' => "/game/$gameID/files",
+            'Players' => "/game/$gameID/players",
+            'Related' => "/game/$gameID/related",
+            'Community' => "/game/$gameID/community",
         ];
 
         if ($gameData['ConsoleID'] == 100) {
