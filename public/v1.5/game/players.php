@@ -11,7 +11,10 @@ if ($gameID == null || $gameID == 0) {
     exit;
 }
 
-authenticateFromCookie($user, $permissions, $userDetails);
+$friendScores = [];
+if (authenticateFromCookie($user, $permissions, $userDetails)) {
+    getAllFriendsProgress($user, $gameID, $friendScores);
+}
 
 $numAchievements = getGameMetaData($gameID, $user, $achievementData, $gameData);
 
@@ -70,6 +73,7 @@ function drawCharts() {
         legend: {position: 'none'},
         chartArea: {'width': '85%', 'height': '78%'},
         height: 260,
+        width: 600,
         colors: ['#cc9900'],
         pointSize: 4,
     };
@@ -134,7 +138,7 @@ function drawCharts() {
             <div id='highscores' style='float:left; margin-left:20px'>
                 <h4>High Scores</h4>
                 <table class='smalltable'><tbody>
-                    <tr><th>Pos</th><th colspan='2' style='max-width:30%'>User</th><th>Mastery Date</th></tr>
+                    <tr><th>Pos</th><th colspan='2' style='max-width:30%'>User</th><th>Points</th></tr>
                     <?php
                         $i = 1;
                         foreach ($gameTopAchievers['HighScores'] as $entry) {
@@ -171,9 +175,61 @@ function drawCharts() {
                 </tbody></table>
             </div>
 
-            <div id='achdistribution' class='component' style='float:left; margin-left:20px'>
-            <h4>Achievement Distribution</h4>
-            <div id='chart_distribution'></div>
+            <div id='friendscores' style='float:left; margin-left:20px'>
+                <h4>Friend Scores</h4>
+                <table class='smalltable'><tbody>
+                    <tr><th>Pos</th><th colspan='2' style='max-width:30%'>User</th><th>Points</th></tr>
+                    <?php
+                        $i = 1;
+                        foreach ($friendScores as $name => $entry) {
+                            // Outline user if they are in the list
+                            if ($user !== null && $user == $name) {
+                                echo "<tr style='outline: thin solid'>";
+                            } else {
+                                echo "<tr>";
+                            }
+
+                            echo "<td class='rank'>";
+                            echo $i;
+                            echo "</td>";
+
+                            echo "<td>";
+                            echo GetUserAndTooltipDiv($name, true);
+                            echo "</td>";
+
+                            echo "<td class='user'>";
+                            echo GetUserAndTooltipDiv($name, false);
+                            echo "</td>";
+
+                            echo "<td class='points'>" . $entry['TotalPoints'] ."</td>";
+                    
+                            echo "</tr>";
+
+                            $i++;
+                            if ($i == 11) {
+                                break;
+                            }
+                        }
+                    ?>
+                </tbody></table>
+            </div>
+        </div>
+
+        <div style='clear:both'></div>
+
+        <div style='margin-top: 10px'>
+            <div id='achdistribution' class='component' style='float:left'>
+                <h4>Achievement Distribution</h4>
+                <div id='chart_distribution'></div>
+            </div>
+
+            <div id='compareuser' style='float:left; margin-left:20px'>
+                <h4>Compare with User</h4>
+                <form method='get' action='/gamecompare.php'>
+                <input type='hidden' name='ID' value='$gameID'>
+                <input size='24' name='f' type='text' class='searchboxgamecompareuser' placeholder='Enter User...' />
+                <input type='submit' value='Select' />
+                </form>
             </div>
         </div>
     </div>
