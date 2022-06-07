@@ -248,3 +248,41 @@ function RenderRecentGamePlayers($recentPlayerData): void
     echo "</tbody></table>";
     echo "</div>";
 }
+
+function RenderGameHeader(array $gameData, string $selectedTab): void
+{
+    $pageTitle = $gameData['Title'] . ' (' . $gameData['ConsoleName'] .')';
+    $gameID = $gameData['ID'];
+?>
+<div style='height: 100px; position: relative'>
+    <div style='float: left'>
+        <img src='<?= asset($gameData['ImageIcon']) ?>' width='96' height='96' alt='<?= attributeEscape($pageTitle) ?>'>
+    </div>
+    <div style='margin-left: 106px'>
+        <h3 class='longheader'><?= $gameData['Title'] ?></h3>
+        <?= $gameData['ConsoleName'] ?>
+        <?php
+        if (!empty($gameData['Developer'])) {
+            echo ' &nbsp; | &nbsp; ';
+            echo $gameData['Developer'];
+        }
+        if (!empty($gameData['Released'])) {
+            echo ' &nbsp; | &nbsp; ';
+            echo $gameData['Released'];
+        }
+        ?>
+    </div>
+    <div style='margin-left: 106px; position: absolute; bottom:0; left: 106'>
+        <?php RenderPageTabs([
+            'Overview' => "/v1.5/game/index.php?ID=$gameID",
+            'Achievements' => "/v1.5/game/achievements.php?ID=$gameID",
+            'Leaderboards' => "/v1.5/game/leaderboards.php?ID=$gameID",
+            'Files' => "/v1.5/game/files.php?ID=$gameID",
+            'Players' => "/v1.5/game/players.php?ID=$gameID",
+            'Related' => "/v1.5/ame/related.php?ID=$gameID",
+            'Community' => "/v1.5/game/community.php?ID=$gameID",
+        ], $selectedTab) ?>
+    </div>
+</div>
+<?php
+}

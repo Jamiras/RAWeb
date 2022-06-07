@@ -471,7 +471,7 @@ function RenderFooter(): void
 
 function RenderThemeSelector(): void
 {
-    $dirContent = scandir('./css/');
+    $dirContent = scandir(getenv('DOC_ROOT') . '/css/');
 
     $cssFileList = [];
     foreach ($dirContent as $filename) {
@@ -520,4 +520,25 @@ function RenderPaginator($numItems, $perPage, $offset, $urlPrefix): void
         $lastOffset = $lastOffset - ($lastOffset % $perPage);
         echo "&nbsp;<a title='Last' href='$urlPrefix$lastOffset'>&#x226B;</a>";
     }
+}
+
+function RenderPageTabs(array $tabs, string $selectedTab)
+{
+    echo "<div class='tab'>";
+
+    foreach ($tabs as $header => $link) {
+        echo "<button class='scores";
+        if ($header == $selectedTab)
+            echo ' active';
+        echo "' style='padding: 5px 8px' onclick='location.href=\"$link\";'>$header</button>";
+    }
+
+    echo '</div>';
+}
+
+function RenderPageStatistic(string $label, string $value)
+{
+    echo "<div style='float: left; margin-right: 10px'>";
+    echo "<b>$label</b><br/>$value";
+    echo "</div>";
 }
