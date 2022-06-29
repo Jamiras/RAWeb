@@ -23,6 +23,7 @@ $userCompletedGamesList = getUsersCompletedGamesAndMax($userPage);
 $userCompletedGamesListCount = count($userCompletedGamesList);
 
 // Merge all elements of $userCompletedGamesList into one unique list
+$userCompletedGames = [];
 for ($i = 0; $i < $userCompletedGamesListCount; $i++) {
     $gameID = $userCompletedGamesList[$i]['GameID'];
 

@@ -111,11 +111,11 @@ RenderHtmlStart(true);
                     $consoleName = $userData['RecentlyPlayed'][$i]['ConsoleName'];
                     $gameTitle = $userData['RecentlyPlayed'][$i]['Title'];
                     $gameLastPlayed = $userData['RecentlyPlayed'][$i]['LastPlayed'];
-        
+
                     sanitize_outputs($consoleName, $gameTitle);
-        
+
                     $pctAwarded = 100.0;
-        
+
                     if (isset($userData['Awarded'][$gameID])) {
                         $numPossibleAchievements = $userData['Awarded'][$gameID]['NumPossibleAchievements'];
                         $maxPossibleScore = $userData['Awarded'][$gameID]['PossibleScore'];
@@ -123,28 +123,28 @@ RenderHtmlStart(true);
                         $scoreEarned = $userData['Awarded'][$gameID]['ScoreAchieved'];
                         $numAchievedHardcore = $userData['Awarded'][$gameID]['NumAchievedHardcore'];
                         $scoreEarnedHardcore = $userData['Awarded'][$gameID]['ScoreAchievedHardcore'];
-        
+
                         settype($numPossibleAchievements, "integer");
                         settype($maxPossibleScore, "integer");
                         settype($numAchieved, "integer");
                         settype($scoreEarned, "integer");
                         settype($numAchievedHardcore, "integer");
                         settype($scoreEarnedHardcore, "integer");
-        
+
                         echo "<div class='userpagegames'>";
-        
+
                         $pctAwardedCasual = "0";
                         $pctAwardedHardcore = "0";
                         $pctComplete = "0";
-        
+
                         if ($numPossibleAchievements > 0) {
                             $pctAwardedCasualVal = $numAchieved / $numPossibleAchievements;
-        
+
                             $pctAwardedHardcoreProportion = 0;
                             if ($numAchieved > 0) {
                                 $pctAwardedHardcoreProportion = $numAchievedHardcore / $numAchieved;
                             }
-        
+
                             $pctAwardedCasual = sprintf("%01.0f", $pctAwardedCasualVal * 100.0);
                             $pctAwardedHardcore = sprintf("%01.0f", $pctAwardedHardcoreProportion * 100.0);
                             $pctComplete = sprintf(
@@ -152,7 +152,7 @@ RenderHtmlStart(true);
                                 (($numAchieved + $numAchievedHardcore) * 100.0 / $numPossibleAchievements)
                             );
                         }
-        
+
                         echo "<div class='progressbar'>";
                         echo "<div class='completion'             style='width:$pctAwardedCasual%'>";
                         echo "<div class='completionhardcore'     style='width:$pctAwardedHardcore%'>";
@@ -165,11 +165,11 @@ RenderHtmlStart(true);
                             echo "$pctComplete% complete<br>";
                         }
                         echo "</div>";
-        
+
                         echo "<a href='/game/$gameID'>$gameTitle ($consoleName)</a><br>";
                         echo "Last played $gameLastPlayed<br>";
                         echo "Earned $numAchieved of $numPossibleAchievements achievements, $scoreEarned/$maxPossibleScore points.<br>";
-        
+
                         if (isset($userData['RecentAchievements'][$gameID])) {
                             foreach ($userData['RecentAchievements'][$gameID] as $achID => $achData) {
                                 $badgeName = $achData['BadgeName'];
@@ -179,10 +179,10 @@ RenderHtmlStart(true);
                                 $achDesc = $achData['Description'];
                                 $achUnlockDate = getNiceDate(strtotime($achData['DateAwarded']));
                                 $achHardcore = $achData['HardcoreAchieved'];
-        
+
                                 $unlockedStr = "";
                                 $class = 'badgeimglarge';
-        
+
                                 if (!$achData['IsAwarded']) {
                                     $badgeName .= "_lock";
                                 } else {
@@ -192,7 +192,7 @@ RenderHtmlStart(true);
                                         $class = 'goldimage';
                                     }
                                 }
-        
+
                                 echo GetAchievementAndTooltipDiv(
                                     $achID,
                                     $achTitle,
@@ -208,13 +208,13 @@ RenderHtmlStart(true);
                                 );
                             }
                         }
-        
+
                         echo "</div>";
                     }
-        
+
                     echo "<br>";
                 }
-        
+
                 /* this link does nothing...
                 if ($maxNumGamesToFetch == 5 && $recentlyPlayedCount == 5) {
                     echo "<div class='rightalign'><a href='/user/$userPage?g=15'>more...</a></div><br>";

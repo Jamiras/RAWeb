@@ -286,11 +286,11 @@ function RenderUserHeader(array $userData, string $selectedTab, bool $isCurrentU
         <?= Permissions::toString($userData['Permissions']) ?> &nbsp; | &nbsp;
         <?= $userData['TotalPoints']; ?> Points
         <?php if (!empty($userData['Motto'])) {
-            echo ' &nbsp; | &nbsp; ';
-            $motto = $userData['Motto'];
-            sanitize_outputs($motto);
-            echo $motto;
-        } ?>
+        echo ' &nbsp; | &nbsp; ';
+        $motto = $userData['Motto'];
+        sanitize_outputs($motto);
+        echo $motto;
+    } ?>
     </div>
     <div style='margin-left: 106px; position: absolute; bottom:0; left: 106; width:88%'>
         <?php
@@ -310,11 +310,11 @@ function RenderUserHeader(array $userData, string $selectedTab, bool $isCurrentU
         ];
 
     if (!$isCurrentUser) {
-        unset ($tabs['Friends']);
+        unset($tabs['Friends']);
     }
 
     if ($userData['Permissions'] < Permissions::JuniorDeveloper) {
-        unset ($tabs['Development']);
+        unset($tabs['Development']);
     }
 
     RenderPageTabs($tabs, $selectedTab) ?>
