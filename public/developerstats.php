@@ -34,15 +34,15 @@ RenderHeader($userDetails);
         echo "<div>";
         echo "<b>Developer Status:</b> ";
         if ($activeDev) {
-            echo "<b><a href='/developerstats.php?t=$type&f=" . ($devFilter & ~(1 << 0)) . "'>*" . PermissionsToString(Permissions::Developer) . "</a></b> | ";
+            echo "<b><a href='/developerstats.php?t=$type&f=" . ($devFilter & ~(1 << 0)) . "'>*" . Permissions::toString(Permissions::Developer) . "</a></b> | ";
         } else {
-            echo "<a href='/developerstats.php?t=$type&f=" . ($devFilter | (1 << 0)) . "'>" . PermissionsToString(Permissions::Developer) . "</a> | ";
+            echo "<a href='/developerstats.php?t=$type&f=" . ($devFilter | (1 << 0)) . "'>" . Permissions::toString(Permissions::Developer) . "</a> | ";
         }
 
         if ($juniorDev) {
-            echo "<b><a href='/developerstats.php?t=$type&f=" . ($devFilter & ~(1 << 1)) . "'>*" . PermissionsToString(Permissions::JuniorDeveloper) . "</a></b> | ";
+            echo "<b><a href='/developerstats.php?t=$type&f=" . ($devFilter & ~(1 << 1)) . "'>*" . Permissions::toString(Permissions::JuniorDeveloper) . "</a></b> | ";
         } else {
-            echo "<a href='/developerstats.php?t=$type&f=" . ($devFilter | (1 << 1)) . "'>" . PermissionsToString(Permissions::JuniorDeveloper) . "</a> | ";
+            echo "<a href='/developerstats.php?t=$type&f=" . ($devFilter | (1 << 1)) . "'>" . Permissions::toString(Permissions::JuniorDeveloper) . "</a> | ";
         }
 
         if ($inactiveDev) {
@@ -71,6 +71,7 @@ RenderHeader($userDetails);
         echo "<th class='text-right text-nowrap'><a href='/developerstats.php?t=4&f=$devFilter'>Ticket Ratio (%)</a>" . ($type == 4 ? "*" : "") . "</th>";
         echo "<th class='text-right'><a href='/developerstats.php?t=2&f=$devFilter' title='Achievements unlocked by others'>Yielded Unlocks</a>" . ($type == 2 ? "*" : "") . "</th>";
         echo "<th class='text-right'><a href='/developerstats.php?t=1&f=$devFilter' title='Points gained by others through achievement unlocks'>Yielded Points</a>" . ($type == 1 ? "*" : "") . "</th>";
+        echo "<th class='text-right'><a href='/developerstats.php?t=7&f=$devFilter' title='Set claims currently active'>Active Claims</a>" . ($type == 7 ? "*" : "") . "</th>";
         // echo "<th class='text-right text-nowrap'><a href='/developerstats.php?t=5'>Last Login</a>" . ($type == AchievementType::UNOFFICIAL ? "*" : "") . "</th>";
 
         $userCount = 0;
@@ -89,7 +90,7 @@ RenderHeader($userDetails);
             echo GetUserAndTooltipDiv($dev, false);
             echo "<br><small>";
             if ($devStats['Permissions'] == Permissions::JuniorDeveloper) {
-                echo PermissionsToString(Permissions::JuniorDeveloper);
+                echo Permissions::toString(Permissions::JuniorDeveloper);
             } elseif ($devStats['Permissions'] <= Permissions::JuniorDeveloper) {
                 echo "Inactive";
             }
@@ -101,6 +102,7 @@ RenderHeader($userDetails);
             echo "<td class='text-right'>" . number_format($devStats['TicketRatio'] * 100, 2) . "</td>";
             echo "<td class='text-right'>" . $devStats['ContribCount'] . "</td>";
             echo "<td class='text-right'>" . $devStats['ContribYield'] . "</td>";
+            echo "<td class='text-right'>" . $devStats['ActiveClaims'] . "</td>";
             // echo "<td class='text-right smalldate'>" . getNiceDate( strtotime( $devStats[ 'LastLogin' ] ) ) . "</td>";
         }
         echo "</tbody></table></div>";

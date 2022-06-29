@@ -193,16 +193,17 @@ RenderHeader($userDetails);
         RenderActivePlayersComponent();
         RenderCurrentlyOnlineComponent();
         echo "<div style='min-height: 160px;' id='chart_usersonline'></div>";
+        renderNewClaimsComponent(5);
         RenderRecentForumPostsComponent($permissions, 4);
         ?>
     </div>
     <div id="rightcontainer" style="padding-top: 20px">
         <?php
-        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'/globalRanking.php?s=5&t=2\' target="_blank" rel="noopener">🥇 Global Ranking</a></div>';
-        echo '<div class=\'btn-patron text-center\' style="margin-bottom: 10px"><a href=\'https://www.patreon.com/bePatron?u=5403777\' target="_blank" rel="noopener">️💙 Become a Patron!</a><!--script async src="https://c6.patreon.com/becomePatronButton.bundle.js"></script--></div>';
-        echo '<div class=\'btn-discord text-center\' style="margin-bottom: 10px"><a href=\'https://discord.gg/' . getenv('DISCORD_INVITE_ID') . '\' target="_blank" rel="noopener">💬 Join us on Discord!</a></div>';
-        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'https://www.youtube.com/channel/UCIGdJGxrzmNYMaAGPsk2sIA\' target="_blank" rel="noopener">🎙️ RAPodcast</a></div>';
-        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'https://news.retroachievements.org/\' target="_blank" rel="noopener">📰 RANews</a></div>';
+        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'/globalRanking.php?s=5&t=2\'>🥇 Global Ranking</a></div>';
+        echo '<div class=\'btn-patron text-center\' style="margin-bottom: 10px"><a href=\'https://www.patreon.com/bePatron?u=5403777\'>️💙 Become a Patron!</a><!--script async src="https://c6.patreon.com/becomePatronButton.bundle.js"></script--></div>';
+        echo '<div class=\'btn-discord text-center\' style="margin-bottom: 10px"><a href=\'https://discord.gg/' . getenv('DISCORD_INVITE_ID') . '\'>💬 Join us on Discord!</a></div>';
+        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'https://www.youtube.com/channel/UCIGdJGxrzmNYMaAGPsk2sIA\'>🎙️ RAPodcast</a></div>';
+        echo '<div class=\'text-center\' style="margin-bottom: 10px"><a href=\'https://news.retroachievements.org/\'>📰 RANews</a></div>';
         RenderDocsComponent();
         RenderAOTWComponent($staticData['Event_AOTW_AchievementID'], $staticData['Event_AOTW_ForumID']);
         RenderStaticDataComponent($staticData);
