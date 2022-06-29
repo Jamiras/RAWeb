@@ -39,15 +39,6 @@ RenderHtmlStart(true);
     <div id="fullcontainer">
         <?php RenderUserHeader($userData, 'Community', $userPage == $user); ?>
         <div style='margin-top: 4px'>
-            <div style='overflow: hidden'>
-            <?php
-//            RenderPageStatistic('Points', (string) $userData['TotalPoints']);
-//            RenderPageStatistic('Retro Points', (string) $userData['TotalTruePoints']);
-//            RenderPageStatistic('Retro Ratio', $retroRatio);
-//            RenderPageStatistic('Games Played', (string) $gamesPlayed);
-//            RenderPageStatistic('Average Completion', $averageCompletion);
-            ?>
-            </div>
             <div style='margin-top:10px; margin-right:266px; overflow: hidden'>
                 <a href='/setRequestList.php?u=<?= $userPage ?>'>Requested Sets</a> - 
                     <?= $userSetRequestInformation['used'] ?> of <?= $userSetRequestInformation['total'] ?> Requests Made

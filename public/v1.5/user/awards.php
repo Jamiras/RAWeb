@@ -58,15 +58,6 @@ RenderHtmlStart(true);
     <div id="fullcontainer">
         <?php RenderUserHeader($userData, 'Awards', $userPage == $user); ?>
         <div style='margin-top: 4px'>
-            <div style='overflow: hidden'>
-            <?php
-//            RenderPageStatistic('Points', (string) $userData['TotalPoints']);
-//            RenderPageStatistic('Retro Points', (string) $userData['TotalTruePoints']);
-//            RenderPageStatistic('Retro Ratio', $retroRatio);
-//            RenderPageStatistic('Games Played', (string) $gamesPlayed);
-//            RenderPageStatistic('Average Completion', $averageCompletion);
-            ?>
-            </div>
             <div class='gamescreenshots' style='margin-top: 20px; width=100%'>
                 <?php RenderSiteAwards(getUsersSiteAwards($userPage), 15); ?>
             </div>
