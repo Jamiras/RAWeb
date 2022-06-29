@@ -39,6 +39,40 @@ RenderHtmlStart(true);
     <div id="fullcontainer">
         <?php RenderUserHeader($userData, 'Community', $userPage == $user); ?>
         <div style='margin-top: 4px'>
+            <?php if (isset($user) && ($user !== $userPage)) {
+                echo "<div class='friendbox'>";
+                echo "<div class='buttoncollection'>";
+
+                if ($userData['Friendship'] == 1) {
+                    if ($userData['FriendReciprocation'] == 1) {
+                        echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=0'>Remove friend</a></span>";
+                    } elseif ($userData['FriendReciprocation'] == 0) {
+                        // They haven't accepted yet
+                        echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=0'>Cancel friend request</a></span>";
+                    } elseif ($userData['FriendReciprocation'] == -1) {
+                        // They blocked us
+                        echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=0'>Remove friend</a></span>";
+                    }
+                } elseif ($userData['Friendship'] == 0) {
+                    if ($userData['FriendReciprocation'] == 1) {
+                        echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=1'>Confirm friend request</a></span>";
+                    } elseif ($userData['FriendReciprocation'] == 0) {
+                        echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=1'>Add friend</a></span>";
+                    }
+                }
+
+                if ($userData['Friendship'] !== -1) {
+                    echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=-1'>Block user</a></span>";
+                } else {
+                    echo "<span class='clickablebutton'><a href='/request/friend/update.php?f=$userPage&amp;a=0'>Unblock user</a></span>";
+                }
+
+                echo "<span class='clickablebutton'><a href='/createmessage.php?t=$userPage'>Send Private Message</a></span>";
+
+                echo "</div>"; // buttoncollection
+                echo "</div>"; // friendbox
+            }
+            ?>
             <div style='margin-top:10px; margin-right:266px; overflow: hidden'>
                 <a href='/setRequestList.php?u=<?= $userPage ?>'>Requested Sets</a> - 
                     <?= $userSetRequestInformation['used'] ?> of <?= $userSetRequestInformation['total'] ?> Requests Made

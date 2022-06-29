@@ -200,7 +200,7 @@ function GetFriendList($user): array
 
     $friendList = [];
 
-    $query = "SELECT f.Friend, ua.RAPoints, ua.RichPresenceMsg AS LastSeen, ua.ID
+    $query = "SELECT f.Friend, ua.RAPoints, ua.RichPresenceMsg AS LastSeen, ua.LastGameID, ua.ID
               FROM Friends AS f
               LEFT JOIN UserAccounts AS ua ON ua.User = f.Friend
               WHERE f.User='$user'
