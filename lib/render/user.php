@@ -273,3 +273,52 @@ function RenderRecentlyAwardedComponent(): void
     echo "<br>";
     echo "</div>";
 }
+
+function RenderUserHeader(array $userData, string $selectedTab, bool $isCurrentUser, string $editLink = null): void
+{
+    $userName = $userData['User']; ?>
+<div style='height: 100px; position: relative'>
+    <div style='float: left'>
+        <img src='<?= asset("/UserPic/$userName.png") ?>' width='96' height='96' alt='<?= attributeEscape($userName) ?>'>
+    </div>
+    <div style='margin-left: 106px'>
+        <h3 class='longheader'><?= $userName ?></h3>
+        <?= Permissions::toString($userData['Permissions']) ?> &nbsp; | &nbsp;
+        <?= $userData['TotalPoints']; ?> Points
+        <?php if (!empty($userData['Motto'])) {
+            echo ' &nbsp; | &nbsp; ';
+            $motto = $userData['Motto'];
+            sanitize_outputs($motto);
+            echo $motto;
+        } ?>
+    </div>
+    <div style='margin-left: 106px; position: absolute; bottom:0; left: 106; width:88%'>
+        <?php
+        if (!empty($editLink)) {
+            echo "<div style='float:right'>";
+            echo "<button class='scores' style='padding: 5px 8px' onclick='location.href=\"$editLink\";'>Edit</button>";
+            echo "</div>";
+        }
+
+    $tabs = [
+            'Overview' => "/user/$userName/overview",
+            'Recent' => "/user/$userName/recent",
+            'Awards' => "/user/$userName/awards",
+            'Development' => "/user/$userName/development",
+            'Friends' => "/user/$userName/friends",
+            'Community' => "/user/$userName/community",
+        ];
+
+    if (!$isCurrentUser) {
+        unset ($tabs['Friends']);
+    }
+
+    if ($userData['Permissions'] < Permissions::JuniorDeveloper) {
+        unset ($tabs['Development']);
+    }
+
+    RenderPageTabs($tabs, $selectedTab) ?>
+    </div>
+</div>
+<?php
+}

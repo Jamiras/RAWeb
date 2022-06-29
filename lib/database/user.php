@@ -271,6 +271,7 @@ function getUserPageInfo(&$user, &$libraryOut, $numGames, $numRecentAchievements
     $libraryOut['Permissions'] = $userInfo['Permissions'];
     $libraryOut['Untracked'] = $userInfo['Untracked'];
     $libraryOut['ID'] = $userInfo['ID'];
+    $libraryOut['User'] = $userInfo['User'];
     $libraryOut['UserWallActive'] = $userInfo['UserWallActive'];
     $libraryOut['Motto'] = $userInfo['Motto'];
 

@@ -20,6 +20,7 @@ RewriteEngine on
 RewriteBase   /
 
 RewriteRule ^achievement/([0-9]*)(.*) achievementInfo.php?ID=$1&$2 [QSA,NC,L]
+RewriteRule ^user/(.*)/([a-z]+)?(.*) v1.5/user/$2.php?ID=$1&$3 [QSA,NC,L]
 RewriteRule ^user/(.*)?(.*)$ userInfo.php?ID=$1&$2 [QSA,NC,L]
 RewriteRule ^game/([0-9]+)/([a-z]+)?(.*) v1.5/game/$2.php?ID=$1&$3 [QSA,NC,L]
 RewriteRule ^game/([0-9]+)?(.*) gameInfo.php?ID=$1&$2 [QSA,NC,L]
