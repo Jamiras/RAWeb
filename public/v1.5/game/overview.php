@@ -48,7 +48,8 @@ $minimumNumberOfRatingsToDisplay = 5;
 $renderRatingControl = function ($label, $containername, $labelname, $ratingData) use ($minimumNumberOfRatingsToDisplay) {
     echo "<div style='float: right; margin-left: 10px; margin-right: 10px'>";
 
-    $yourRating = ($ratingData['UserRating'] > 0) ? $ratingData['UserRating'] : 'not rated';
+    $yourRating = $ratingData['UserRating'] ?? 0;
+    $yourRating = ($yourRating > 0) ? $yourRating : 'not rated';
 
     $voters = $ratingData['RatingCount'];
     if ($voters < $minimumNumberOfRatingsToDisplay) {
@@ -118,7 +119,7 @@ RenderHtmlStart(true);
 ?>
 <head prefix="og: http://ogp.me/ns# retroachievements: http://ogp.me/ns/apps/retroachievements#">
     <?php RenderSharedHeader(); ?>
-    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] .')'); ?>
+    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')'); ?>
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
@@ -306,9 +307,9 @@ $(function () {
                 </div>
                 <div style='overflow: hidden'>
                 <?php
-                RenderPageStatistic('Achievements', $numAchievements);
-                RenderPageStatistic('Points', $numPoints);
-                RenderPageStatistic('Leaderboards', $numLeaderboards);
+                RenderPageStatistic('Achievements', (string) $numAchievements);
+                RenderPageStatistic('Points', (string) $numPoints);
+                RenderPageStatistic('Leaderboards', (string) $numLeaderboards);
                 RenderPageStatistic('Players', $gameData['NumDistinctPlayersCasual']);
                 $renderRatingControl('Game Rating', 'ratinggame', 'ratinggamelabel', $gameRating[RatingType::Game]);
                 ?>

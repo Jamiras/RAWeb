@@ -27,7 +27,7 @@ RenderHtmlStart(true);
 ?>
 <head prefix="og: http://ogp.me/ns# retroachievements: http://ogp.me/ns/apps/retroachievements#">
     <?php RenderSharedHeader(); ?>
-    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] .')'); ?>
+    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')'); ?>
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
@@ -166,7 +166,7 @@ function drawCharts() {
                             echo "<td class='points'>";
                             echo "<span class='hoverable' title='Latest awarded at $nextLastAward'>$nextPoints</span>";
                             echo "</td>";
-                    
+
                             echo "</tr>";
 
                             $i++;
@@ -201,8 +201,8 @@ function drawCharts() {
                             echo GetUserAndTooltipDiv($name, false);
                             echo "</td>";
 
-                            echo "<td class='points'>" . $entry['TotalPoints'] ."</td>";
-                    
+                            echo "<td class='points'>" . $entry['TotalPoints'] . "</td>";
+
                             echo "</tr>";
 
                             $i++;

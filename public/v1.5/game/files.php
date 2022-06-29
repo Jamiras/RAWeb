@@ -37,7 +37,7 @@ RenderHtmlStart(true);
 ?>
 <head prefix="og: http://ogp.me/ns# retroachievements: http://ogp.me/ns/apps/retroachievements#">
     <?php RenderSharedHeader(); ?>
-    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] .')'); ?>
+    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')'); ?>
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
@@ -110,7 +110,7 @@ RenderHtmlStart(true);
             </ul>
             <?php
                 if ($gameData['ForumTopicID'] > 0) {
-                    echo "Additional information for these hashes may be listed on the <a href='viewtopic.php?t=" . $gameData['ForumTopicID'] ."'>official forum topic</a>.<br/>";
+                    echo "Additional information for these hashes may be listed on the <a href='viewtopic.php?t=" . $gameData['ForumTopicID'] . "'>official forum topic</a>.<br/>";
                 }
             ?>
             <br/>

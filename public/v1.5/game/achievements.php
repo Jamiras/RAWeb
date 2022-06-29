@@ -61,7 +61,7 @@ RenderHtmlStart(true);
 ?>
 <head prefix="og: http://ogp.me/ns# retroachievements: http://ogp.me/ns/apps/retroachievements#">
     <?php RenderSharedHeader(); ?>
-    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] .')'); ?>
+    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')'); ?>
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
@@ -88,27 +88,21 @@ RenderHtmlStart(true);
                     echo "<br>";
                     echo "<br>";
 
-                    if ($user !== null && $numAchievements > 0) {
-                        $pctAwardedCasual = 0;
-                        $pctAwardedHardcore = 0;
-                        $pctComplete = 0;
-
-                        if ($numAchievements) {
-                            $pctAwardedCasual = $numEarnedCasual / $numAchievements;
-                            $pctAwardedHardcore = $numEarnedHardcore / $numAchievements;
-                            $pctAwardedHardcoreProportion = 0;
-                            if ($numEarnedHardcore > 0) {
-                                $pctAwardedHardcoreProportion = $numEarnedHardcore / $numEarnedCasual;
-                            }
-
-                            $pctAwardedCasual = sprintf("%01.0f", $pctAwardedCasual * 100.0);
-                            $pctAwardedHardcore = sprintf("%01.0f", $pctAwardedHardcoreProportion * 100.0);
-
-                            $pctComplete = sprintf(
-                                "%01.0f",
-                                (($numEarnedCasual + $numEarnedHardcore) * 100.0 / $numAchievements)
-                            );
+                    if ($user !== null) {
+                        $pctAwardedCasual = $numEarnedCasual / $numAchievements;
+                        $pctAwardedHardcore = $numEarnedHardcore / $numAchievements;
+                        $pctAwardedHardcoreProportion = 0;
+                        if ($numEarnedHardcore > 0) {
+                            $pctAwardedHardcoreProportion = $numEarnedHardcore / $numEarnedCasual;
                         }
+
+                        $pctAwardedCasual = sprintf("%01.0f", $pctAwardedCasual * 100.0);
+                        $pctAwardedHardcore = sprintf("%01.0f", $pctAwardedHardcoreProportion * 100.0);
+
+                        $pctComplete = sprintf(
+                            "%01.0f",
+                            (($numEarnedCasual + $numEarnedHardcore) * 100.0 / $numAchievements)
+                        );
 
                         echo "<div class='progressbar'>";
                         echo "<div class='completion' style='width:$pctAwardedCasual%'>";

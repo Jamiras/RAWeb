@@ -260,11 +260,10 @@ function RenderRecentGamePlayers($recentPlayerData): void
     echo "</div>";
 }
 
-function RenderGameHeader(array $gameData, string $selectedTab, string $editLink=null): void
+function RenderGameHeader(array $gameData, string $selectedTab, string $editLink = null): void
 {
-    $pageTitle = $gameData['Title'] . ' (' . $gameData['ConsoleName'] .')';
-    $gameID = $gameData['ID'];
-?>
+    $pageTitle = $gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')';
+    $gameID = $gameData['ID']; ?>
 <div style='height: 100px; position: relative'>
     <div style='float: left'>
         <img src='<?= asset($gameData['ImageIcon']) ?>' width='96' height='96' alt='<?= attributeEscape($pageTitle) ?>'>
@@ -277,11 +276,10 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
             echo ' &nbsp; | &nbsp; ';
             echo $gameData['Developer'];
         }
-        if (!empty($gameData['Released'])) {
-            echo ' &nbsp; | &nbsp; ';
-            echo $gameData['Released'];
-        }
-        ?>
+    if (!empty($gameData['Released'])) {
+        echo ' &nbsp; | &nbsp; ';
+        echo $gameData['Released'];
+    } ?>
     </div>
     <div style='margin-left: 106px; position: absolute; bottom:0; left: 106; width:88%'>
         <?php
@@ -291,7 +289,7 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
             echo "</div>";
         }
 
-        $tabs = [
+    $tabs = [
             'Overview' => "/game/$gameID/overview",
             'Achievements' => "/game/$gameID/achievements",
             'Leaderboards' => "/game/$gameID/leaderboards",
@@ -301,18 +299,18 @@ function RenderGameHeader(array $gameData, string $selectedTab, string $editLink
             'Community' => "/game/$gameID/community",
         ];
 
-        if ($gameData['ConsoleID'] == 100) {
-            // achievements and players are visible for Events
-            unset($tabs['Achievements']);
-            unset($tabs['Players']);
-        }
+    if ($gameData['ConsoleID'] == 100) {
+        // achievements and players are visible for Events
+        unset($tabs['Achievements']);
+        unset($tabs['Players']);
+    }
 
-        if ($gameData['ConsoleID'] >= 100) {
-            unset($tabs['Leaderboards']);
-            unset($tabs['Files']);
-        }
+    if ($gameData['ConsoleID'] >= 100) {
+        unset($tabs['Leaderboards']);
+        unset($tabs['Files']);
+    }
 
-        RenderPageTabs($tabs, $selectedTab) ?>
+    RenderPageTabs($tabs, $selectedTab) ?>
     </div>
 </div>
 <?php

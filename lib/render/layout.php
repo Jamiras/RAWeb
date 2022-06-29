@@ -557,8 +557,9 @@ function RenderPageTabs(array $tabs, string $selectedTab)
 
     foreach ($tabs as $header => $link) {
         echo "<button class='scores";
-        if ($header == $selectedTab)
+        if ($header == $selectedTab) {
             echo ' active';
+        }
         echo "' style='padding: 5px 8px' onclick='location.href=\"$link\";'>$header</button>";
     }
 

@@ -114,7 +114,7 @@ function getTopicSummaries(array $topicIDs, int $permissions): ?array
                 LEFT JOIN ForumTopicComment AS ftc ON ftc.ID = ft.LatestCommentID
                 LEFT JOIN Forum AS f ON f.ID = ft.ForumID
                 LEFT JOIN ForumTopicComment AS ftc2 ON ftc2.ForumTopicID = ft.ID AND ftc2.Authorised = 1
-                WHERE ft.ID IN (" . implode(',', $topicIDs) .")
+                WHERE ft.ID IN (" . implode(',', $topicIDs) . ")
                 AND ft.RequiredPermissions <= $permissions
                 GROUP BY ft.ID, LatestCommentPostedDate
                 ORDER BY LatestCommentPostedDate DESC";

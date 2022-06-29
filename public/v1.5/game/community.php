@@ -1,7 +1,6 @@
 <?php
 
 use RA\ArticleType;
-use RA\Permissions;
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
 require_once __DIR__ . '/../../../lib/bootstrap.php';
@@ -29,7 +28,7 @@ RenderHtmlStart(true);
 ?>
 <head prefix="og: http://ogp.me/ns# retroachievements: http://ogp.me/ns/apps/retroachievements#">
     <?php RenderSharedHeader(); ?>
-    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] .')'); ?>
+    <?php RenderTitleTag($gameData['Title'] . ' (' . $gameData['ConsoleName'] . ')'); ?>
 </head>
 <body>
 <?php RenderHeader($userDetails); ?>
@@ -37,13 +36,11 @@ RenderHtmlStart(true);
     <div id="fullcontainer">
         <?php RenderGameHeader($gameData, 'Community'); ?>
         <div style='margin-top: 4px'>
-            <?php 
-                if ($topicData) {
-                    $postedNiceDate = getNiceDate(strtotime($topicData['ForumTopicPostedDate']));
-                    $lastCommentPostedNiceDate = getNiceDate(strtotime($topicData['LatestCommentPostedDate']));
-                    $lastCommentID = $topicData['LatestCommentID'];
-                    $topicID = $topicData['ForumTopicID'];
-            ?>
+            <?php if ($topicData) {
+    $postedNiceDate = getNiceDate(strtotime($topicData['ForumTopicPostedDate']));
+    $lastCommentPostedNiceDate = getNiceDate(strtotime($topicData['LatestCommentPostedDate']));
+    $lastCommentID = $topicData['LatestCommentID'];
+    $topicID = $topicData['ForumTopicID']; ?>
                 <table><tbody>
                     <tr class='forumsheader'><th></th><th class='fullwidth'>Topics</th><th>Author</th><th>Replies</th><th class='text-nowrap'>Last post</th></tr>
                     <tr>
@@ -60,10 +57,11 @@ RenderHtmlStart(true);
                         </td>
                     </tr>
                 </tbody></table>
-            <?php } ?>
+            <?php
+} ?>
         </div>
         <div style='margin-top: 20px'>
-            <?php RenderCommentsComponent($user, $numArticleComments, $commentData, $gameID, ArticleType::Game, $permissions >= Permissions::Admin); ?>
+            <?php RenderCommentsComponent($user, $numArticleComments, $commentData, $gameID, ArticleType::Game, $permissions); ?>
         </div>
     </div>
 </div>
