@@ -31,7 +31,7 @@ function SeparateAwards($userAwards): array
     return [$gameAwards, $eventAwards, $siteAwards];
 }
 
-function RenderSiteAwards($userAwards): void
+function RenderSiteAwards($userAwards, $numCols = 5): void
 {
     [$gameAwards, $eventAwards, $siteAwards] = SeparateAwards($userAwards);
 
@@ -59,11 +59,11 @@ function RenderSiteAwards($userAwards): void
     usort($groups, fn ($a, $b) => $a[0] - $b[0]);
 
     foreach ($groups as $group) {
-        RenderAwardGroup($group[1], $group[2]);
+        RenderAwardGroup($group[1], $group[2], $numCols);
     }
 }
 
-function RenderAwardGroup($awards, $title): void
+function RenderAwardGroup($awards, $title, $numCols): void
 {
     $numItems = is_countable($awards) ? count($awards) : 0;
     if ($numItems == 0) {
@@ -76,7 +76,6 @@ function RenderAwardGroup($awards, $title): void
     echo "<table class='siteawards'><tbody>";
 
     $imageSize = 48;
-    $numCols = 5;
     for ($i = 0; $i < ceil($numItems / $numCols); $i++) {
         echo "<tr>";
         for ($j = 0; $j < $numCols; $j++) {
