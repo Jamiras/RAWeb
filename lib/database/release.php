@@ -127,3 +127,140 @@ function getActiveEmulatorReleases(): array
 
     return $emulators;
 }
+
+function isValidClientForHardcore(string &$minimumVersion): bool
+{
+    $client = parseUserAgent();
+    $releases = getReleasesFromFile();
+    $emulators = array_filter($releases['emulators'] ?? [], fn ($emulator) => $emulator['active'] ?? false);
+    foreach ($emulators as $emulator) {
+        if (strcasecmp($emulator['handle'], $client['Client']) == 0) {
+            return (array_key_exists($emulator['minimum_version']) &&
+                $client['ClientVersion'] != 'Unknown' &&
+                version_compare($client['ClientVersion'], $emulator['minimum_version']) >= 0);
+        }
+    }
+
+    return false;
+}
+
+function parseUserAgent(?string $userAgent = null): array
+{
+    $result = ['Client' => 'Unknown', 'ClientVersion' => 'Unknown'];
+
+    // RALibRetro/1.3.11 (WindowsNT 10.0) Integration/1.0.4.0
+    // RetroArch/1.8.1 (Windows 10 x64 Build 18362 10.0) quicknes_libretro/1.0-WIP_7c0796d
+    if ($userAgent === null) {
+        $userAgent = request()->header('User-Agent') ?? $_SERVER['HTTP_USER_AGENT'] ?? '';
+    }
+    $userAgentLength = strlen($userAgent);
+
+    $index = strpos($userAgent, '/');
+    if ($index !== false) {
+        // found "Client/Version", just split it
+        $result['Client'] = substr($userAgent, 0, $index);
+
+        $index2 = strpos($userAgent, '(', $index);
+        if ($index2 === false) {
+            $index2 = strpos($userAgent, ' ', $index);
+            if ($index2 === false) {
+                 $index2 = $userAgentLength;
+            }
+        }
+        $result['ClientVersion'] = trim(substr($userAgent, $index + 1, $index2 - $index - 1));
+    } else {
+        // not in form "Client/Version", try to extract version from end of string
+
+        // ignore 'nightly' moniker
+        $userAgent = str_ireplace('nightly', '', $userAgent);
+        $userAgentLength = strlen($userAgent);
+
+        $index2 = strpos($userAgent, '(');
+        if ($index2 === false) {
+            $index2 = $userAgentLength;
+        }
+
+        // skip whitespace
+        $index = $index2;
+        while ($index > 0) {
+            $c = substr($userAgent, $index - 1, 1);
+            if (!ctype_space($c)) {
+                break;
+            }
+            $index--;
+        }
+
+        if ($index === 0 || !ctype_digit(substr($userAgent, $index - 1, 1))) {
+            // does not end in a number, can't extract version
+            $result['Client'] = $userAgent;
+            return $result;
+        }
+
+        // capture numbers and decimals
+        do {
+            if ($index === 0) {
+                // did not find non-version character, abort
+                $result['Client'] = $userAgent;
+                return $result;
+            }
+
+            $c = substr($userAgent, --$index, 1);
+            if (!is_numeric($c) && $c !== '.') {
+                // found non-version character, split on it
+                break;
+            }
+        } while (true);
+
+        $result['ClientVersion'] = trim(substr($userAgent, $index + 1, $index2 - $index - 1));
+
+        // trim non-alphanumeric stuff
+        while ($index > 0) {
+            $c = substr($userAgent, $index - 1, 1);
+            if (ctype_alnum($c)) {
+                break;
+            }
+            $index--;
+        }
+
+        $result['Client'] = substr($userAgent, 0, $index);
+    }
+
+    if ($index2 == $userAgentLength) {
+        return $result;
+    }
+
+    // assume the first chunk in parenthesis is the operating system
+    if (substr($userAgent, $index2, 1) == '(') {
+        $index3 = strpos($userAgent, ')', $index2);
+        if ($index3 !== false) {
+            $result['OS'] = substr($userAgent, $index2 + 1, $index3 - $index2 - 1);
+            $index2 = $index3;
+        }
+    }
+
+    // put any other "key/value" pairs into the 'Extra' bucket
+    $index4 = strpos($userAgent, '/', $index2);
+    if ($index4 !== false) {
+        $result['Extra'] = [];
+
+        do {
+            // to get strrpos to search backwards, we have to provide a negative offset to the index
+            $index5 = strrpos($userAgent, ' ', -($userAgentLength - $index4));
+            if ($index5 === false) {
+                break;
+            }
+            $index6 = strpos($userAgent, ' ', $index4);
+            if ($index6 === false) {
+                $index6 = $userAgentLength;
+            }
+    
+            $submodule = substr($userAgent, $index5 + 1, $index4 - $index5 - 1);
+            $subversion = substr($userAgent, $index4 + 1, $index6 - $index4 - 1);
+            $result['Extra'][$submodule] = $subversion;
+    
+            $index4 = strpos($userAgent, '/', $index6);
+        } while ($index4 !== false);
+    }
+
+    return $result;
+}
