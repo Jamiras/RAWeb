@@ -128,19 +128,32 @@ function getActiveEmulatorReleases(): array
     return $emulators;
 }
 
-function isValidClientForHardcore(string &$minimumVersion): bool
+function isValidClientForHardcore(string &$errorMessage): bool
 {
     $client = parseUserAgent();
     $releases = getReleasesFromFile();
     $emulators = array_filter($releases['emulators'] ?? [], fn ($emulator) => $emulator['active'] ?? false);
     foreach ($emulators as $emulator) {
         if (strcasecmp($emulator['handle'], $client['Client']) == 0) {
-            return (array_key_exists($emulator['minimum_version']) &&
-                $client['ClientVersion'] != 'Unknown' &&
-                version_compare($client['ClientVersion'], $emulator['minimum_version']) >= 0);
+            if (!array_key_exists('minimum_version', $emulator)) {
+                return true;
+            }
+
+            if ($client['ClientVersion'] === 'Unknown') {
+                $errorMessage = 'Unknown client version';
+                return false;
+            }
+
+            if (version_compare($client['ClientVersion'], $emulator['minimum_version']) < 0) {
+                $errorMessage = $emulator['handle'] . ' version ' . $emulator['minimum_version'] . ' or higher required for hardcore';
+                return false;
+            }
+
+            return true;
         }
     }
 
+    $errorMessage = 'Unknown client';
     return false;
 }
 
@@ -197,7 +210,7 @@ function parseUserAgent(?string $userAgent = null): array
         }
 
         // capture numbers and decimals
-        do {
+        while (true) {
             if ($index === 0) {
                 // did not find non-version character, abort
                 $result['Client'] = $userAgent;
@@ -209,7 +222,7 @@ function parseUserAgent(?string $userAgent = null): array
                 // found non-version character, split on it
                 break;
             }
-        } while (true);
+        }
 
         $result['ClientVersion'] = trim(substr($userAgent, $index + 1, $index2 - $index - 1));
 
@@ -253,11 +266,11 @@ function parseUserAgent(?string $userAgent = null): array
             if ($index6 === false) {
                 $index6 = $userAgentLength;
             }
-    
+
             $submodule = substr($userAgent, $index5 + 1, $index4 - $index5 - 1);
             $subversion = substr($userAgent, $index4 + 1, $index6 - $index4 - 1);
             $result['Extra'][$submodule] = $subversion;
-    
+
             $index4 = strpos($userAgent, '/', $index6);
         } while ($index4 !== false);
     }

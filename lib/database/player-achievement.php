@@ -81,7 +81,15 @@ function unlockAchievement(string $user, $achIDToAward, $isHardcore): array
 
     $awardedOK = true;
     if ($isHardcore && !$hasHardcore) {
-        $awardedOK &= insertAchievementUnlockIntoAwardedTable($user, $achIDToAward, true);
+        $errorMessage = '';
+        if (isValidClientForHardcore($errorMessage)) {
+            $awardedOK &= insertAchievementUnlockIntoAwardedTable($user, $achIDToAward, true);
+        } elseif ($hasRegular) {
+            $retVal['Error'] = $errorMessage;
+            return $retVal;
+        } else {
+            $retVal['Warning'] = $errorMessage;
+        }
     }
     if (!$hasRegular && $awardedOK) {
         $awardedOK &= insertAchievementUnlockIntoAwardedTable($user, $achIDToAward, false);

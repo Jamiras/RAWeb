@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use Tests\Unit\TestCase;
-
 final class ReleaseTest extends TestCase
 {
     public function testIntegrationUserAgent(): void
