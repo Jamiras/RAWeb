@@ -27,12 +27,14 @@ use App\Models\System;
 use App\Platform\Commands\CrawlPlayerWeightedPoints;
 use App\Platform\Commands\CreateAchievementOfTheWeek;
 use App\Platform\Commands\DeleteStalePlayerPointsStatsEntries;
+use App\Platform\Commands\DumpGameStats;
 use App\Platform\Commands\NoIntroImport;
 use App\Platform\Commands\ProcessExpiringClaims;
 use App\Platform\Commands\PruneDuplicateSubsetNotes;
 use App\Platform\Commands\PruneGameRecentPlayers;
 use App\Platform\Commands\ResetPlayerAchievement;
 use App\Platform\Commands\RevertManualUnlocks;
+use App\Platform\Commands\SummarizeGameStats;
 use App\Platform\Commands\SyncEvents;
 use App\Platform\Commands\UnlockPlayerAchievement;
 use App\Platform\Commands\UpdateAwardsStaticData;
@@ -68,8 +70,10 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 // Games
+                DumpGameStats::class,
                 PruneDuplicateSubsetNotes::class,
                 PruneGameRecentPlayers::class,
+                SummarizeGameStats::class,
                 UpdateGameAchievementsMetrics::class,
                 UpdateGameBeatenMetrics::class,
                 UpdateGameMetrics::class,
