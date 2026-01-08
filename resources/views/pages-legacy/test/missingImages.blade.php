@@ -10,19 +10,20 @@ $filterID = requestInputSanitized('f', 0, 'integer');
 
 $filter = match($filterID)
 {
-    0 => "(ImageIcon = '/Images/000001.png' ||
-           ImageTitle = '/Images/000002.png' ||
-           ImageIngame = '/Images/000002.png' ||
-           ImageBoxArt = '/Images/000002.png')",
+    0 => "(image_icon_asset_path = '/Images/000001.png' ||
+           image_title_asset_path = '/Images/000002.png' ||
+           image_ingame_asset_path = '/Images/000002.png' ||
+           image_box_art_asset_path = '/Images/000002.png')",
     1 => "achievements_published = 0",
 };
 
-$query = "SELECT g.ID, g.Title, g.ConsoleID, g.ImageIcon, c.Name as ConsoleName, g.Genre
-          FROM GameData g LEFT JOIN Console c ON c.ID=g.ConsoleID WHERE $filter";
+$query = "SELECT g.id as ID, g.title as Title, g.system_id as ConsoleID,
+                 g.image_icon_asset_path as ImageIcon, s.name as ConsoleName, g.genre as Genre
+          FROM games g LEFT JOIN systems s ON s.id=g.system_id WHERE $filter";
 if ($consoleID > 0) {
-    $query .= " AND ConsoleID = $consoleID";
+    $query .= " AND g.system_id = $consoleID";
 } else {
-    $query .= " AND ConsoleID < 100";
+    $query .= " AND g.system_id < 100";
 }
 $query .= " ORDER BY RAND() LIMIT 10";
 $gamesList = legacyDbFetchAll($query)->sortBy('Title');
