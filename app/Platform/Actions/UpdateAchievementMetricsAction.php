@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Platform\Actions;
 
+use App\Community\Enums\RankType;
 use App\Models\Achievement;
 use App\Models\Game;
 use App\Models\PlayerAchievement;
-use App\Models\User;
 use App\Platform\Services\SearchIndexingService;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class UpdateAchievementMetricsAction
 {
+    public function __construct(
+        protected readonly CalculateAchievementWeightedPointsAction $calculateWeightedPoints,
+    ) {
+    }
+
     public function execute(Achievement $achievement): void
     {
         $this->update($achievement->game, collect([$achievement]));
@@ -32,17 +36,15 @@ class UpdateAchievementMetricsAction
 
         // NOTE if game has a parent game it contains the parent game's players metrics
         $playersTotal = $game->players_total;
-        $playersHardcore = $game->players_hardcore;
-        $playersHardcoreCalc = $playersHardcore ?: 1;
+        $playersHardcore = $game->players_hardcore ?? 0;
+        $rankedPlayerCount = countRankedUsers(RankType::TruePoints);
 
         // Get both total and hardcore counts in a single query.
         $achievementIds = $achievements->pluck('id')->all();
         $unlockStats = PlayerAchievement::query()
+            ->leftJoin('unranked_users', 'player_achievements.user_id', '=', 'unranked_users.user_id')
+            ->whereNull('unranked_users.user_id')
             ->whereIn('player_achievements.achievement_id', $achievementIds)
-            ->whereHas('user', function ($query) {
-                /** @var Builder<User> $query */
-                $query->tracked();
-            })
             ->groupBy('player_achievements.achievement_id')
             ->selectRaw('
                 player_achievements.achievement_id,
@@ -72,14 +74,13 @@ class UpdateAchievementMetricsAction
 
         foreach ($achievements as $achievement) {
             $unlocksCount = $unlockCounts[$achievement->id] ?? 0;
-            $unlocksHardcoreCount = $hardcoreUnlockCounts[$achievement->id] ?? 0;
+            $unlocksHardcoreCount = (int) ($hardcoreUnlockCounts[$achievement->id] ?? 0);
 
-            // force all unachieved to be 1
-            $unlocksHardcoreCalc = $unlocksHardcoreCount ?: 1;
-            $weight = 0.4;
-            $pointsWeighted = (int) (
-                $achievement->points * (1 - $weight)
-                + $achievement->points * (($playersHardcoreCalc / $unlocksHardcoreCalc) * $weight)
+            $pointsWeighted = $this->calculateWeightedPoints->execute(
+                $achievement->points,
+                $unlocksHardcoreCount,
+                $playersHardcore,
+                $rankedPlayerCount
             );
 
             // Round percentages to 9 decimal places to match the exact database column precision (decimal(10,9)).
@@ -131,70 +132,54 @@ class UpdateAchievementMetricsAction
     }
 
     /**
-     * In Horizon, each write requires an entire network round trip to the DB.
-     * If there are hundreds of achievements to update, and each achievement
-     * round trip takes 1-5ms, this could add up to additional second(s) of
-     * processing time in the job just from pure network overhead. To mitigate
-     * this, we'll do a single bulk update.
+     * Bulk update achievements using CASE statements to minimize network round trips.
+     *
+     * Uses READ COMMITTED isolation to prevent gap lock deadlocks. The default
+     * REPEATABLE READ acquires gap locks on WHERE IN clauses, which deadlock when
+     * concurrent jobs update non-overlapping achievement ID ranges. READ COMMITTED
+     * only locks the exact rows being updated, eliminating this class of deadlock.
+     *
+     * This is safe because the transaction contains a single UPDATE with pre-computed
+     * values, so we don't need the REPEATABLE READ feature's consistent snapshot guarantees.
+     *
+     * @see https://mariadb.com/kb/en/innodb-lock-modes/ "Gap locks are disabled if ... the isolation level is set to READ COMMITTED."
+     * @see https://mariadb.com/kb/en/set-transaction/ Without GLOBAL/SESSION keyword, scopes to the next transaction only.
      */
     private function performBulkUpdate(array $bulkUpdates): void
     {
-        // Build a bulk UPDATE query using CASE statements to update all achievements in a single DB statement.
+        usort($bulkUpdates, fn ($a, $b) => $a['id'] <=> $b['id']);
 
-        /*
-         * The final query will look like this:
-         *
-         * UPDATE achievements
-         * SET
-         *   unlocks_total = CASE id
-         *     WHEN X THEN Y
-         *   END,
-         *   unlocks_hardcore = CASE id
-         *     WHEN X THEN Y
-         *   END,
-         *   unlock_percentage = CASE id
-         *     WHEN X THEN Y
-         *   END,
-         *   unlock_hardcore_percentage = CASE id
-         *     WHEN X THEN Y
-         *   END,
-         *   points_weighted = CASE id
-         *     WHEN X THEN Y
-         *   END,
-         *   Updated = '...'
-         * WHERE id IN ( ... )
-         */
-        $ids = array_column($bulkUpdates, 'id');
-        $cases = [
-            'unlocks_total' => 'CASE id',
-            'unlocks_hardcore' => 'CASE id',
-            'unlock_percentage' => 'CASE id',
-            'unlock_hardcore_percentage' => 'CASE id',
-            'points_weighted' => 'CASE id',
+        $columns = [
+            'unlocks_total',
+            'unlocks_hardcore',
+            'unlock_percentage',
+            'unlock_hardcore_percentage',
+            'points_weighted',
         ];
 
-        foreach ($bulkUpdates as $update) {
-            $cases['unlocks_total'] .= " WHEN {$update['id']} THEN {$update['unlocks_total']}";
-            $cases['unlocks_hardcore'] .= " WHEN {$update['id']} THEN {$update['unlocks_hardcore']}";
-            $cases['unlock_percentage'] .= " WHEN {$update['id']} THEN {$update['unlock_percentage']}";
-            $cases['unlock_hardcore_percentage'] .= " WHEN {$update['id']} THEN {$update['unlock_hardcore_percentage']}";
-            $cases['points_weighted'] .= " WHEN {$update['id']} THEN {$update['points_weighted']}";
+        // Build a CASE expression for each column so all rows update in a single statement.
+        $cases = [];
+        foreach ($columns as $column) {
+            $whens = implode(' ', array_map(
+                fn ($row) => "WHEN {$row['id']} THEN {$row[$column]}",
+                $bulkUpdates,
+            ));
+            $cases[$column] = DB::raw("CASE id {$whens} END");
         }
 
-        foreach ($cases as &$case) {
-            $case .= ' END';
+        $cases['updated_at'] = now();
+
+        // Scoped to the next transaction only. Does not affect other queries on this connection.
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            DB::statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
         }
 
-        // Use DB to bypass model events.
-        DB::table('achievements')
-            ->whereIn('id', $ids)
-            ->update([
-                'unlocks_total' => DB::raw($cases['unlocks_total']),
-                'unlocks_hardcore' => DB::raw($cases['unlocks_hardcore']),
-                'unlock_percentage' => DB::raw($cases['unlock_percentage']),
-                'unlock_hardcore_percentage' => DB::raw($cases['unlock_hardcore_percentage']),
-                'points_weighted' => DB::raw($cases['points_weighted']),
-                'updated_at' => now(),
-            ]);
+        $ids = array_column($bulkUpdates, 'id');
+
+        DB::transaction(function () use ($ids, $cases) {
+            DB::table('achievements')
+                ->whereIn('id', $ids)
+                ->update($cases);
+        });
     }
 }

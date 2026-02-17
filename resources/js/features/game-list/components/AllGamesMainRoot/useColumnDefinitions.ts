@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { usePageProps } from '@/common/hooks/usePageProps';
 
 import { buildAchievementsPublishedColumnDef } from '../../utils/column-definitions/buildAchievementsPublishedColumnDef';
+import { buildBeatRatioColumnDef } from '../../utils/column-definitions/buildBeatRatioColumnDef';
+import { buildBeatTimeColumnDef } from '../../utils/column-definitions/buildBeatTimeColumnDef';
 import { buildHasActiveOrInReviewClaimsColumnDef } from '../../utils/column-definitions/buildHasActiveOrInReviewClaimsColumnDef';
 import { buildLastUpdatedColumnDef } from '../../utils/column-definitions/buildLastUpdatedColumnDef';
 import { buildNumUnresolvedTicketsColumnDef } from '../../utils/column-definitions/buildNumUnresolvedTicketsColumnDef';
@@ -23,8 +25,7 @@ export function useColumnDefinitions(options: {
   forUsername?: string;
 }): ColumnDef<App.Platform.Data.GameListEntry>[] {
   const { auth } = usePageProps();
-
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const columnDefinitions = useMemo(() => {
     const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
@@ -32,9 +33,15 @@ export function useColumnDefinitions(options: {
       buildSystemColumnDef({ t_label: t('System') }),
       buildAchievementsPublishedColumnDef({ t_label: t('Achievements') }),
       buildPointsTotalColumnDef({ t_label: t('Points') }),
-      buildRetroRatioColumnDef({ t_label: t('Rarity'), strings: { t_none: t('none') } }),
-      buildLastUpdatedColumnDef({ t_label: t('Last Updated') }),
+      buildRetroRatioColumnDef({ t_label: t('RetroRatio'), strings: { t_none: t('none') } }),
+      buildBeatRatioColumnDef({ t_label: t('Beat %') }),
+      buildBeatTimeColumnDef({
+        t_label: t('Time to Beat'),
+        strings: { t_none: t('None'), t_not_enough_data: t('Not enough data') },
+      }),
+      buildLastUpdatedColumnDef({ locale: i18n.language, t_label: t('Last Updated') }),
       buildReleasedAtColumnDef({
+        locale: i18n.language,
         t_label: t('Release Date'),
         strings: { t_unknown: t('unknown') },
       }),
@@ -64,7 +71,7 @@ export function useColumnDefinitions(options: {
     );
 
     return columns;
-  }, [auth?.user, options.canSeeOpenTicketsColumn, options.forUsername, t]);
+  }, [auth?.user, i18n.language, options.canSeeOpenTicketsColumn, options.forUsername, t]);
 
   return columnDefinitions;
 }

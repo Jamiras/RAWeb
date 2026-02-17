@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import type { RouteName } from 'ziggy-js';
 
 import { buildAchievementsPublishedColumnDef } from '../../utils/column-definitions/buildAchievementsPublishedColumnDef';
+import { buildBeatRatioColumnDef } from '../../utils/column-definitions/buildBeatRatioColumnDef';
+import { buildBeatTimeColumnDef } from '../../utils/column-definitions/buildBeatTimeColumnDef';
 import { buildHasActiveOrInReviewClaimsColumnDef } from '../../utils/column-definitions/buildHasActiveOrInReviewClaimsColumnDef';
 import { buildLastUpdatedColumnDef } from '../../utils/column-definitions/buildLastUpdatedColumnDef';
 import { buildNumUnresolvedTicketsColumnDef } from '../../utils/column-definitions/buildNumUnresolvedTicketsColumnDef';
@@ -23,7 +25,7 @@ export function useColumnDefinitions(options: {
   canSeeOpenTicketsColumn: boolean;
   forUsername?: string;
 }): ColumnDef<App.Platform.Data.GameListEntry>[] {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const columnDefinitions = useMemo(() => {
     const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
@@ -37,11 +39,21 @@ export function useColumnDefinitions(options: {
       buildPointsTotalColumnDef({ tableApiRouteName, t_label: t('Points') }),
       buildRetroRatioColumnDef({
         tableApiRouteName,
-        t_label: t('Rarity'),
+        t_label: t('RetroRatio'),
         strings: { t_none: t('none') },
       }),
-      buildLastUpdatedColumnDef({ tableApiRouteName, t_label: t('Last Updated') }),
+      buildBeatRatioColumnDef({ t_label: t('Beat %') }),
+      buildBeatTimeColumnDef({
+        t_label: t('Time to Beat'),
+        strings: { t_none: t('None'), t_not_enough_data: t('Not enough data') },
+      }),
+      buildLastUpdatedColumnDef({
+        locale: i18n.language,
+        tableApiRouteName,
+        t_label: t('Last Updated'),
+      }),
       buildReleasedAtColumnDef({
+        locale: i18n.language,
         tableApiRouteName,
         t_label: t('Release Date'),
         strings: { t_unknown: t('unknown') },
@@ -72,7 +84,7 @@ export function useColumnDefinitions(options: {
     );
 
     return columns;
-  }, [options.canSeeOpenTicketsColumn, options.forUsername, t]);
+  }, [i18n.language, options.canSeeOpenTicketsColumn, options.forUsername, t]);
 
   return columnDefinitions;
 }

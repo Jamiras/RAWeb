@@ -1,22 +1,22 @@
 <?php
 
 use App\Actions\FindUserByIdentifierAction;
-use App\Connect\Actions\BuildClientPatchDataAction;
-use App\Connect\Actions\BuildClientPatchDataV2Action;
+use App\Connect\Actions\GetAchievementSetsAction;
 use App\Connect\Actions\GetAchievementUnlocksAction;
 use App\Connect\Actions\GetBadgeIdRangeAction;
-use App\Connect\Actions\GetClientSupportLevelAction;
 use App\Connect\Actions\GetCodeNotesAction;
 use App\Connect\Actions\GetFriendListAction;
 use App\Connect\Actions\GetGameIdFromHashAction;
 use App\Connect\Actions\GetGameInfosAction;
+use App\Connect\Actions\GetGamesListAction;
 use App\Connect\Actions\GetHashLibraryAction;
 use App\Connect\Actions\GetLatestClientVersionAction;
 use App\Connect\Actions\GetLatestIntegrationVersionAction;
 use App\Connect\Actions\GetLeaderboardEntriesAction;
+use App\Connect\Actions\GetOfficialGamesListAction;
 use App\Connect\Actions\GetPlayerGameUnlocksAction;
 use App\Connect\Actions\GetUserProgressForConsoleAction;
-use App\Connect\Actions\InjectPatchClientSupportLevelDataAction;
+use App\Connect\Actions\LegacyGetPatchAction;
 use App\Connect\Actions\LegacyLoginAction;
 use App\Connect\Actions\LoginAction;
 use App\Connect\Actions\PingAction;
@@ -25,13 +25,13 @@ use App\Connect\Actions\StartSessionAction;
 use App\Connect\Actions\SubmitCodeNoteAction;
 use App\Connect\Actions\SubmitGameTitleAction;
 use App\Connect\Actions\SubmitLeaderboardAction;
+use App\Connect\Actions\SubmitLeaderboardEntryAction;
 use App\Connect\Actions\SubmitRichPresenceAction;
 use App\Enums\ClientSupportLevel;
 use App\Enums\Permissions;
 use App\Models\Achievement;
 use App\Models\Game;
 use App\Models\GameHash;
-use App\Models\Leaderboard;
 use App\Models\PlayerAchievement;
 use App\Models\User;
 use App\Platform\Jobs\UnlockPlayerAchievementJob;
@@ -43,11 +43,13 @@ use Illuminate\Support\Carbon;
 $requestType = request()->input('r');
 $handler = match ($requestType) {
     'achievementwondata' => new GetAchievementUnlocksAction(),
+    'achievementsets' => new GetAchievementSetsAction(),
     'allprogress' => new GetUserProgressForConsoleAction(),
     'badgeiter' => new GetBadgeIdRangeAction(),
     'codenotes2' => new GetCodeNotesAction(),
     'gameid' => new GetGameIdFromHashAction(),
     'gameinfolist' => new GetGameInfosAction(),
+    'gameslist' => new GetGamesListAction(),
     'getfriendlist' => new GetFriendListAction(),
     'hashlibrary' => new GetHashLibraryAction(),
     'latestclient' => new GetLatestClientVersionAction(),
@@ -55,11 +57,14 @@ $handler = match ($requestType) {
     'lbinfo' => new GetLeaderboardEntriesAction(),
     'login' => new LegacyLoginAction(),
     'login2' => new LoginAction(),
+    'officialgameslist' => new GetOfficialGamesListAction(),
+    'patch' => new LegacyGetPatchAction(),
     'ping' => new PingAction(),
     'postactivity' => new PostActivityAction(),
     'startsession' => new StartSessionAction(),
     'submitcodenote' => new SubmitCodeNoteAction(),
     'submitgametitle' => new SubmitGameTitleAction(),
+    'submitlbentry' => new SubmitLeaderboardEntryAction(),
     'submitrichpresence' => new SubmitRichPresenceAction(),
     'unlocks' => new GetPlayerGameUnlocksAction(),
     'uploadleaderboard' => new SubmitLeaderboardAction(),
@@ -138,13 +143,10 @@ $credentialsOK = match ($requestType) {
     /*
      * Registration required and user=local
      */
-    "achievementsets",
     "awardachievement",
     "awardachievements",
-    "patch",
     "richpresencepatch",
     "submitgametitle",
-    "submitlbentry",
     "submitrichpresence",
     "uploadachievement" => $validLogin && ($permissions >= Permissions::Registered),
     /*
@@ -217,19 +219,6 @@ if (
 }
 
 switch ($requestType) {
-    /*
-     * Global, no permissions required
-     */
-    case "gameslist":
-        $consoleID = (int) request()->input('c', 0);
-        $response['Response'] = getGamesListDataNamesOnly($consoleID);
-        break;
-
-    case "officialgameslist": // TODO: is this used anymore? It's not used by the DLL.
-        $consoleID = (int) request()->input('c', 0);
-        $response['Response'] = getGamesListDataNamesOnly($consoleID, true);
-        break;
-
     /*
      * User-based (require credentials)
      */
@@ -416,122 +405,9 @@ switch ($requestType) {
 
         break;
 
-    case "achievementsets":
-    case "patch":
-        $version = $requestType === 'achievementsets' ? 2 : 1;
-        $flag = (int) request()->input('f', 0);
-        $gameHashMd5 = request()->input('m');
-
-        $clientSupportLevel = (new GetClientSupportLevelAction())->execute(
-            request()->header('User-Agent') ?? '[not provided]'
-        );
-
-        // TODO middleware?
-        if ($clientSupportLevel === ClientSupportLevel::Blocked) {
-            return DoRequestError('This client is not supported', 403, 'unsupported_client');
-        }
-
-        try {
-            $game = null;
-            $gameHash = null;
-            if (VirtualGameIdService::isVirtualGameId($gameID)) {
-                // we don't have a specific game hash. check to see if the user is selected for
-                // compatibility testing for any hash for the game. if so, load it.
-                if ($user) {
-                    [$realGameId, $compatibility] = VirtualGameIdService::decodeVirtualGameId($gameID);
-                    if (GameHash::where('game_id', $realGameId)->where('compatibility_tester_id', $user->id)->exists()) {
-                        $game = Game::find($realGameId);
-                    }
-                }
-                if (!$game) {
-                    $gameHash = VirtualGameIdService::makeVirtualGameHash($gameID);
-                }
-            } elseif ($gameHashMd5) {
-                $gameHash = GameHash::whereMd5($gameHashMd5)->first();
-            } else {
-                $game = Game::find($gameID);
-            }
-
-            $buildDataAction = $version === 2
-                ? (new BuildClientPatchDataV2Action())
-                : (new BuildClientPatchDataAction());
-
-            $response = $buildDataAction->execute(
-                gameHash: $gameHash,
-                game: $game,
-                user: $user,
-                isPromoted: Achievement::isPromotedFromLegacyFlags($flag),
-            );
-
-            // Based on the user's current client support level, we may want to attach
-            // some metadata into the patch response. We'll do that as part of a separate
-            // action to keep the original data construction pure.
-            $response = (new InjectPatchClientSupportLevelDataAction())->execute(
-                $response,
-                $clientSupportLevel,
-                $gameHash,
-                $game,
-            );
-        } catch (InvalidArgumentException $e) {
-            return DoRequestError('Unknown game', 404, 'not_found');
-        }
-        break;
-
     case "richpresencepatch":
         $response['Success'] = getRichPresencePatch($gameID, $richPresenceData);
         $response['RichPresencePatch'] = $richPresenceData;
-        break;
-
-    case "submitlbentry":
-        $lbID = (int) request()->input('i', 0);
-        $score = (int) request()->input('s', 0);
-        $validationHash = request()->input('v');
-        $gameHashMd5 = request()->input('m');
-
-        $userAgentService = new UserAgentService();
-        $clientSupportLevel = $userAgentService->getSupportLevel(request()->header('User-Agent'));
-        if ($clientSupportLevel === ClientSupportLevel::Blocked) {
-            $response = [
-                'Status' => 403,
-                'Success' => false,
-                'Error' => 'This emulator is not supported',
-            ];
-            break;
-        }
-
-        // ignore negative values and offsets greater than max. clamping offset will invalidate validationHash.
-        $maxOffset = 14 * 24 * 60 * 60; // 14 days
-        $offset = min(max((int) request()->input('o', 0), 0), $maxOffset);
-
-        $foundLeaderboard = Leaderboard::where('id', $lbID)->first();
-        if (!$foundLeaderboard) {
-            $response['Success'] = false;
-            $response['Error'] = "Cannot find the leaderboard with ID: $lbID";
-
-            break;
-        }
-
-        if (
-            $offset > 0
-            && strcasecmp(
-                $validationHash,
-                $foundLeaderboard->submitValidationHash($user, $score, $offset)
-            ) !== 0
-        ) {
-            $offset = 0;
-        }
-
-        $gameHash = null;
-        if ($gameHashMd5) {
-            $gameHash = GameHash::whereMd5($gameHashMd5)->first();
-        }
-
-        // TODO dispatch job or event/listener using an action
-        $response['Response'] = SubmitLeaderboardEntry($user, $foundLeaderboard, $score, $validationHash, $gameHash, Carbon::now()->subSeconds($offset), $clientSupportLevel);
-        $response['Success'] = $response['Response']['Success']; // Passthru
-        if (!$response['Success']) {
-            $response['Error'] = $response['Response']['Error'];
-        }
         break;
 
     case "submitticket":
