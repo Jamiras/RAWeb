@@ -67,7 +67,7 @@ class BuildGameListAction
 
         // The base query may not respect ->distinct() operations done by some filters.
         // We'll override its `total` value with the correct one.
-        $total = $query->count('GameData.ID');
+        $total = $query->count('games.id');
 
         // Automatically adjust the current page if it exceeds the last page.
         $page = $this->ensurePageWithinBounds(
@@ -135,9 +135,9 @@ class BuildGameListAction
     private function getBacklogGames(User $user, Collection $gameIds): Collection
     {
         return $user->gameListEntries()
-            ->whereIn('GameID', $gameIds)
+            ->whereIn('game_id', $gameIds)
             ->where('type', UserGameListType::Play)
-            ->pluck('GameID')
+            ->pluck('game_id')
             ->flip(); // We flip the pluck results to use game IDs as keys for faster lookup.
     }
 
@@ -151,7 +151,7 @@ class BuildGameListAction
             ->whereIn('game_id', $gameIds)
             ->with(['badges' => function ($query) use ($user) {
                 $query->where('user_id', $user->id)
-                    ->whereIn('AwardType', [AwardType::GameBeaten, AwardType::Mastery]);
+                    ->whereIn('award_type', [AwardType::GameBeaten, AwardType::Mastery]);
             }])
             ->get()
             ->keyBy('game_id');
@@ -167,7 +167,7 @@ class BuildGameListAction
     {
         $unfilteredTotal = null;
         if (!empty($filters)) {
-            $unfilteredTotal = (clone $query)->count('GameData.ID');
+            $unfilteredTotal = (clone $query)->count('games.id');
         }
 
         return $unfilteredTotal;
@@ -239,8 +239,10 @@ class BuildGameListAction
                     'claimants',
                     'hasActiveOrInReviewClaims',
                     'lastUpdated',
+                    'medianTimeToBeatHardcore',
                     'numRequests',
                     'numVisibleLeaderboards',
+                    'playersHardcore',
                     'playersTotal',
                     'pointsTotal',
                     'pointsWeighted',
@@ -248,6 +250,7 @@ class BuildGameListAction
                     'releasedAtGranularity',
                     'system.iconUrl',
                     'system.nameShort',
+                    'timesBeatenHardcore',
                     $user?->can('develop') ? 'numUnresolvedTickets' : '',
                 ),
                 'playerGame' => $playerGame

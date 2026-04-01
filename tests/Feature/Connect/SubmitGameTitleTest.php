@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Connect;
 
-use App\Community\Enums\ArticleType;
+use App\Community\Enums\CommentableType;
 use App\Enums\GameHashCompatibility;
 use App\Enums\Permissions;
 use App\Models\Game;
 use App\Models\Role;
 use App\Models\System;
+use App\Platform\Actions\UpsertGameCoreAchievementSetFromLegacyFlagsAction;
 use App\Platform\Enums\AchievementSetType;
 use Database\Seeders\RolesTableSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ class SubmitGameTitleTest extends TestCase
         /** @var System $system2 */
         $system2 = System::factory()->create();
         /** @var Game $game1 */
-        $game1 = Game::factory()->create(['ConsoleID' => $system2->id]);
+        $game1 = Game::factory()->create(['system_id' => $system2->id]);
 
         $this->seed(RolesTableSeeder::class);
         $this->addServerUser();
@@ -102,7 +103,7 @@ class SubmitGameTitleTest extends TestCase
         $this->assertEquals($title, $newGame->releases()->first()->title);
         $this->assertEquals(true, $newGame->releases()->first()->is_canonical_game_title);
 
-        $this->assertAuditComment(ArticleType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
+        $this->assertAuditComment(CommentableType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
 
         /* game and hash already exist (game will be matched by title and console) */
         $this->get($this->apiUrl('submitgametitle', [
@@ -119,7 +120,7 @@ class SubmitGameTitleTest extends TestCase
                 ],
             ]);
 
-        $this->assertFalse(Game::where('ID', $newGame->id + 1)->exists());
+        $this->assertFalse(Game::where('id', $newGame->id + 1)->exists());
 
         $newGame->refresh();
         $this->assertEquals($title, $newGame->title);
@@ -156,7 +157,7 @@ class SubmitGameTitleTest extends TestCase
         $this->assertEquals(1, $newGame->releases()->count());
         $this->assertEquals($title, $newGame->releases()->first()->title);
 
-        $this->assertAuditComment(ArticleType::GameHash, $newGame2->id, "$md5 linked by {$this->user->display_name}. Description: \"Game (U).nes\"");
+        $this->assertAuditComment(CommentableType::GameHash, $newGame2->id, "$md5 linked by {$this->user->display_name}. Description: \"Game (U).nes\"");
 
         /* invalid title */
         $md5 = fake()->md5;
@@ -244,7 +245,7 @@ class SubmitGameTitleTest extends TestCase
         $this->assertEquals($md5, $game->hashes->slice(1, 1)->first()->md5);
         $this->assertEquals(GameHashCompatibility::Compatible, $game->hashes->slice(1, 1)->first()->compatibility);
 
-        $this->assertAuditComment(ArticleType::GameHash, $game->id, "$md5 linked by {$this->user->display_name}.");
+        $this->assertAuditComment(CommentableType::GameHash, $game->id, "$md5 linked by {$this->user->display_name}.");
     }
 
     public function testSubmitInactiveConsole(): void
@@ -252,7 +253,7 @@ class SubmitGameTitleTest extends TestCase
         /** @var System $system */
         $system = System::factory()->create(['active' => false]);
         /** @var Game $game */
-        $game = Game::factory()->create(['ConsoleID' => $system->id]);
+        $game = Game::factory()->create(['system_id' => $system->id]);
 
         $this->seed(RolesTableSeeder::class);
         $this->addServerUser();
@@ -277,7 +278,7 @@ class SubmitGameTitleTest extends TestCase
                 'Success' => false,
             ]);
 
-        $this->assertFalse(Game::where('ID', $game->id + 1)->exists());
+        $this->assertFalse(Game::where('id', $game->id + 1)->exists());
 
         /* new md5 for existing game */
         $this->get($this->apiUrl('submitgametitle', [
@@ -322,7 +323,7 @@ class SubmitGameTitleTest extends TestCase
         $this->assertEquals(1, $newGame->releases()->count());
         $this->assertEquals($title, $newGame->releases()->first()->title);
 
-        $this->assertAuditComment(ArticleType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
+        $this->assertAuditComment(CommentableType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
 
         /* new md5 for existing game */
         $md5 = fake()->md5;
@@ -349,6 +350,107 @@ class SubmitGameTitleTest extends TestCase
         $this->assertEquals(1, $newGame->releases()->count());
         $this->assertEquals($title, $newGame->releases()->first()->title);
 
-        $this->assertAuditComment(ArticleType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
+        $this->assertAuditComment(CommentableType::GameHash, $newGame->id, "$md5 linked by {$this->user->display_name}.");
+    }
+
+    public function testSubmitNewSubsetGameWithExistingParent(): void
+    {
+        /** @var System $system */
+        $system = System::factory()->create();
+
+        // create the parent game first with its core achievement set
+        /** @var Game $parentGame */
+        $parentGame = Game::factory()->create([
+            'title' => 'Mega Man 2',
+            'system_id' => $system->id,
+        ]);
+        (new UpsertGameCoreAchievementSetFromLegacyFlagsAction())->execute($parentGame);
+
+        $this->seed(RolesTableSeeder::class);
+        $this->addServerUser();
+
+        $this->user->assignRole(Role::DEVELOPER);
+        $this->user->save();
+
+        $md5 = fake()->md5;
+        $subsetTitle = 'Mega Man 2 [Subset - Bonus]';
+
+        $this->get($this->apiUrl('submitgametitle', [
+            'm' => $md5,
+            'i' => $subsetTitle,
+            'c' => $system->id,
+        ]))
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'Success',
+                'GameID',
+                'Response' => ['GameID'],
+            ]);
+
+        // verify the subset game was created
+        $subsetGame = Game::where('title', $subsetTitle)->first();
+        $this->assertNotNull($subsetGame);
+        $this->assertEquals($subsetTitle, $subsetGame->title);
+        $this->assertEquals($system->id, $subsetGame->system_id);
+
+        // verify the subset game has its own core achievement set
+        $this->assertEquals(1, $subsetGame->gameAchievementSets()->count());
+        $subsetCoreSet = $subsetGame->gameAchievementSets()->first();
+        $this->assertEquals(AchievementSetType::Core, $subsetCoreSet->type);
+
+        // verify the parent game now has the subset's achievement set attached as Exclusive
+        $parentGame->refresh();
+        $parentGameSets = $parentGame->gameAchievementSets()->get();
+        $this->assertEquals(2, $parentGameSets->count());
+
+        $attachedSet = $parentGameSets->firstWhere('type', AchievementSetType::Exclusive);
+        $this->assertNotNull($attachedSet);
+        $this->assertEquals('Bonus', $attachedSet->title);
+        $this->assertEquals($subsetCoreSet->achievement_set_id, $attachedSet->achievement_set_id);
+    }
+
+    public function testSubmitNewSubsetGameWithNoParent(): void
+    {
+        /** @var System $system */
+        $system = System::factory()->create();
+
+        // ... we intentionally don't create a parent game right here ...
+
+        $this->seed(RolesTableSeeder::class);
+        $this->addServerUser();
+
+        $this->user->assignRole(Role::DEVELOPER);
+        $this->user->save();
+
+        $md5 = fake()->md5;
+        $subsetTitle = 'Nonexistent Game [Subset - Bonus]';
+
+        $this->get($this->apiUrl('submitgametitle', [
+            'm' => $md5,
+            'i' => $subsetTitle,
+            'c' => $system->id,
+        ]))
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'Success',
+                'GameID',
+                'Response' => ['GameID'],
+            ]);
+
+        // verify the subset game was created
+        $subsetGame = Game::where('title', $subsetTitle)->first();
+        $this->assertNotNull($subsetGame);
+        $this->assertEquals($subsetTitle, $subsetGame->title);
+
+        // verify the subset game has its own core achievement set
+        $this->assertEquals(1, $subsetGame->gameAchievementSets()->count());
+        $subsetCoreSet = $subsetGame->gameAchievementSets()->first();
+        $this->assertEquals(AchievementSetType::Core, $subsetCoreSet->type);
+
+        // verify no parent attachment was made (since no parent exists)
+        // the subset's achievement set should only be attached to itself
+        $attachedGames = $subsetCoreSet->achievementSet->games()->get();
+        $this->assertEquals(1, $attachedGames->count());
+        $this->assertEquals($subsetGame->id, $attachedGames->first()->id);
     }
 }

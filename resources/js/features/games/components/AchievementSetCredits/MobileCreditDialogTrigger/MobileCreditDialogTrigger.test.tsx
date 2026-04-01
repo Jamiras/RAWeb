@@ -1,7 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 
-import { ClaimStatus } from '@/common/utils/generatedAppConstants';
 import { render, screen, waitFor } from '@/test';
 import {
   createAchievementSetClaim,
@@ -377,6 +376,36 @@ describe('Component: MobileCreditDialogTrigger', () => {
     expect(screen.getByText(/badgeartist1/i)).toBeVisible();
   });
 
+  it('given there is banner artwork credit, shows the Banner Artwork section in the dialog', async () => {
+    // ARRANGE
+    const bannerArtist = createUserCredits({
+      displayName: 'BannerArtist1',
+      dateCredited: '2024-01-20T00:00:00Z',
+    });
+    const aggregateCredits = createAggregateAchievementSetCredits({
+      achievementSetBanner: [bannerArtist], // !!
+    });
+
+    render(
+      <MobileCreditDialogTrigger
+        achievementSetClaims={[]}
+        aggregateCredits={aggregateCredits}
+        artCreditUsers={[bannerArtist]}
+        codingCreditUsers={[]}
+        designCreditUsers={[]}
+      />,
+    );
+
+    // ACT
+    await userEvent.click(screen.getByRole('button'));
+
+    // ASSERT
+    await waitFor(() => {
+      expect(screen.getByText(/banner artwork/i)).toBeVisible();
+    });
+    expect(screen.getByText(/bannerartist1/i)).toBeVisible();
+  });
+
   it('given there is achievement artwork credit, shows the Achievement Artwork section in the dialog', async () => {
     // ARRANGE
     const achArtist = createUserCredits({
@@ -605,7 +634,7 @@ describe('Component: MobileCreditDialogTrigger', () => {
     const achievementSetClaims = [
       createAchievementSetClaim({
         user: createUser({ displayName: 'Alice' }),
-        status: ClaimStatus.InReview, // !!
+        status: 'in_review', // !!
       }),
     ];
 
@@ -629,7 +658,7 @@ describe('Component: MobileCreditDialogTrigger', () => {
     const achievementSetClaims = [
       createAchievementSetClaim({
         user: createUser({ displayName: 'Alice' }),
-        status: ClaimStatus.Active, // !! not In Review
+        status: 'active', // !! not In Review
       }),
     ];
 
@@ -653,7 +682,7 @@ describe('Component: MobileCreditDialogTrigger', () => {
     const achievementSetClaims = [
       createAchievementSetClaim({
         user: createUser({ displayName: 'Alice' }),
-        status: ClaimStatus.InReview, // !!
+        status: 'in_review', // !!
         finishedAt: dayjs().add(1, 'month').toISOString(),
       }),
     ];

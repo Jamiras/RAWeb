@@ -45,8 +45,13 @@ class RouteServiceProvider extends ServiceProvider
 
     protected function mapWebRoutes(): void
     {
+        // Order of operations matters. This must be before the wildcard and outside the web group.
+        Route::get('request/card.php', fn () => $this->handleRequest('request/card'));
+
         Route::middleware(['web'])->group(function () {
-            // prohibit GET form requests in request/
+            Route::post('request/card.php', fn () => $this->handleRequest('request/card'));
+
+            // Prohibit GET form requests in request/.
             Route::get('request/{path}.php', fn (string $path) => abort(405))->where('path', '(.*)');
             Route::post('request/{path}.php', fn (string $path) => $this->handleRequest('request/' . $path))->where('path', '(.*)');
         });
@@ -55,8 +60,7 @@ class RouteServiceProvider extends ServiceProvider
 
         Route::middleware(['web', 'csp'])->group(function () {
             Route::get('{path}.php', fn (string $path) => $this->handlePageRequest($path))->where('path', '(.*)');
-            Route::get('user/{user}', fn (string $user) => $this->handlePageRequest('userInfo', $user))->name('user.show');
-            Route::get('achievement/{achievementId}{slug?}', fn ($achievementId) => $this->handlePageRequest('achievementInfo', $achievementId))->name('achievement.show');
+            Route::get('user/{user}', fn (string $user) => $this->handlePageRequest('userInfo', $user))->name('user.show')->middleware('cacheResponse');
             Route::get('leaderboard/{leaderboard}{slug?}', fn ($leaderboard) => $this->handlePageRequest('leaderboardinfo', $leaderboard))->name('leaderboard.show');
         });
 
@@ -64,7 +68,7 @@ class RouteServiceProvider extends ServiceProvider
             /*
              * content
              */
-            Route::middleware(['inertia'])->group(function () {
+            Route::middleware(['cacheResponse', 'inertia'])->group(function () {
                 Route::get('/', [HomeController::class, 'index'])->name('home');
 
                 Route::get('downloads', [DownloadsController::class, 'index'])->name('download.index');

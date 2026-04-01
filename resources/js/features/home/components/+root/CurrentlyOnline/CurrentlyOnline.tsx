@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { type FC, useMemo } from 'react';
+import type { FC } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { LuTrophy } from 'react-icons/lu';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -11,9 +11,9 @@ import {
   BaseChartTooltip,
   BaseChartTooltipContent,
 } from '@/common/components/+vendor/BaseChart';
+import { useFormatDate } from '@/common/hooks/useFormatDate';
 import { usePageProps } from '@/common/hooks/usePageProps';
 import { cn } from '@/common/utils/cn';
-import { formatDate } from '@/common/utils/l10n/formatDate';
 
 import { HomeHeading } from '../../HomeHeading';
 import { useCurrentlyOnlineChart } from './useCurrentlyOnlineChart';
@@ -24,6 +24,7 @@ export const CurrentlyOnline: FC = () => {
   const { currentlyOnline, ziggy } = usePageProps<App.Http.Data.HomePageProps>();
 
   const { t } = useTranslation();
+  const { formatDate } = useFormatDate();
 
   const { chartData, yAxisTicks, formatTooltipLabel, formatXAxisTick, formatYAxisTick } =
     useCurrentlyOnlineChart(currentlyOnline);
@@ -35,16 +36,11 @@ export const CurrentlyOnline: FC = () => {
     },
   } satisfies BaseChartConfig;
 
-  const isNewAllTimeHigh = useMemo(() => {
-    if (!currentlyOnline?.allTimeHighPlayers || !currentlyOnline?.logEntries.length) {
-      return false;
-    }
-
-    return (
-      currentlyOnline.logEntries[currentlyOnline.logEntries.length - 1] >=
-      currentlyOnline.allTimeHighPlayers
-    );
-  }, [currentlyOnline]);
+  const latestLogEntry = currentlyOnline?.logEntries?.[currentlyOnline.logEntries.length - 1];
+  const isNewAllTimeHigh =
+    !!currentlyOnline?.allTimeHighPlayers &&
+    !!latestLogEntry &&
+    latestLogEntry >= currentlyOnline.allTimeHighPlayers;
 
   return (
     <div className="flex flex-col gap-2.5">

@@ -1,5 +1,4 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RouteName } from 'ziggy-js';
 
@@ -14,46 +13,43 @@ import { buildTitleColumnDef } from '../../utils/column-definitions/buildTitleCo
 export function useColumnDefinitions(
   targetUser?: App.Data.User | null,
 ): ColumnDef<App.Platform.Data.GameListEntry>[] {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const tableApiRouteName: RouteName = targetUser
     ? 'api.set-request.user'
     : 'api.set-request.index';
 
-  const columnDefinitions = useMemo(() => {
-    const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
-      buildTitleColumnDef({ t_label: t('Title'), tableApiRouteName }),
-      buildSystemColumnDef({ t_label: t('System'), tableApiRouteName }),
-      buildReleasedAtColumnDef({
-        tableApiRouteName,
-        t_label: t('Release Date'),
-        strings: { t_unknown: t('unknown') },
-      }),
-      buildNumRequestsColumnDef({
-        tableApiRouteName,
-        t_label: t('Requests'),
-      }),
-    ];
+  const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
+    buildTitleColumnDef({ t_label: t('Title'), tableApiRouteName }),
+    buildSystemColumnDef({ t_label: t('System'), tableApiRouteName }),
+    buildReleasedAtColumnDef({
+      locale: i18n.language,
+      tableApiRouteName,
+      t_label: t('Release Date'),
+      strings: { t_unknown: t('unknown') },
+    }),
+    buildNumRequestsColumnDef({
+      tableApiRouteName,
+      t_label: t('Requests'),
+    }),
+  ];
 
-    // Only show the achievements column for user-specific views.
-    if (targetUser) {
-      columns.push(buildAchievementsPublishedColumnDef({ t_label: t('Achievements') }));
-    }
+  // Only show the achievements column for user-specific views.
+  if (targetUser) {
+    columns.push(buildAchievementsPublishedColumnDef({ t_label: t('Achievements') }));
+  }
 
-    columns.push(
-      buildHasActiveOrInReviewClaimsColumnDef({
-        tableApiRouteName,
-        t_label: t('Claimed'),
-        strings: {
-          t_no: t('No'),
-          t_yes: t('Yes'),
-        },
-      }),
-      buildRowActionsColumnDef({ shouldAnimateBacklogIconOnChange: true }),
-    );
+  columns.push(
+    buildHasActiveOrInReviewClaimsColumnDef({
+      tableApiRouteName,
+      t_label: t('Claimed'),
+      strings: {
+        t_no: t('No'),
+        t_yes: t('Yes'),
+      },
+    }),
+    buildRowActionsColumnDef({ shouldAnimateBacklogIconOnChange: true }),
+  );
 
-    return columns;
-  }, [t, tableApiRouteName, targetUser]);
-
-  return columnDefinitions;
+  return columns;
 }

@@ -5,6 +5,8 @@ use App\Models\Event;
 use App\Models\EventAward;
 use App\Models\PlayerBadge;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Str;
 
 function SeparateAwards(array $userAwards): array
 {
@@ -12,7 +14,7 @@ function SeparateAwards(array $userAwards): array
     $awardEventIds = [];
     foreach ($userAwards as $award) {
         $type = (int) $award['AwardType'];
-        if ($type === AwardType::Event) {
+        if ($type === AwardType::Event->toLegacyInteger()) {
             $awardEventIds[] = (int) $award['AwardData'];
         } elseif (AwardType::isGame($type) && $award['ConsoleName'] === 'Events') {
             $awardEventGameIds[] = (int) $award['AwardData'];
@@ -26,8 +28,10 @@ function SeparateAwards(array $userAwards): array
     }
 
     $eventData = new Collection();
+    $eventAwardData = new Collection();
     if (!empty($awardEventIds)) {
         $eventData = Event::whereIn('id', $awardEventIds)->with('legacyGame')->get()->keyBy('id');
+        $eventAwardData = EventAward::whereIn('event_id', $awardEventIds)->get()->groupBy('event_id');
     }
 
     $gameAwards = []; // Mastery awards that aren't Events.
@@ -41,26 +45,28 @@ function SeparateAwards(array $userAwards): array
         if (AwardType::isGame($type)) {
             if ($award['ConsoleName'] === 'Events') {
                 $eventAwards[] = $award;
-            } elseif ($award['AwardType'] !== AwardType::GameBeaten) {
+            } elseif ($type !== AwardType::GameBeaten->toLegacyInteger()) {
                 $gameAwards[] = $award;
             }
-        } elseif ($type === AwardType::Event) {
+        } elseif ($type === AwardType::Event->toLegacyInteger()) {
             if ($eventData[$id]?->gives_site_award) {
                 $siteAwards[] = $award;
             } else {
                 $eventAwards[] = $award;
             }
+        } elseif ($type === AwardType::Playtest->toLegacyInteger()) {
+            $siteAwards[] = $award;
         } elseif (AwardType::isActive($type)) {
             $siteAwards[] = $award;
         }
     }
 
-    return [$gameAwards, $eventAwards, $siteAwards, $eventData];
+    return [$gameAwards, $eventAwards, $siteAwards, $eventData, $eventAwardData];
 }
 
 function RenderSiteAwards(array $userAwards, string $awardsOwnerUsername): void
 {
-    [$gameAwards, $eventAwards, $siteAwards, $eventData] = SeparateAwards($userAwards);
+    [$gameAwards, $eventAwards, $siteAwards, $eventData, $eventAwardData] = SeparateAwards($userAwards);
 
     $groups = [];
 
@@ -102,15 +108,21 @@ function RenderSiteAwards(array $userAwards, string $awardsOwnerUsername): void
     usort($groups, fn ($a, $b) => $a[0] - $b[0]);
 
     foreach ($groups as $group) {
-        RenderAwardGroup($group[1], $group[2], $awardsOwnerUsername, $eventData);
+        RenderAwardGroup($group[1], $group[2], $awardsOwnerUsername, $eventData, $eventAwardData);
     }
 }
 
 /**
  * @param Collection<int, Event> $eventData
+ * @param SupportCollection<int, Collection<int, EventAward>> $eventAwardData
  */
-function RenderAwardGroup(array $awards, string $title, string $awardsOwnerUsername, Collection $eventData): void
-{
+function RenderAwardGroup(
+    array $awards,
+    string $title,
+    string $awardsOwnerUsername,
+    Collection $eventData,
+    SupportCollection $eventAwardData,
+): void {
     $numItems = count($awards);
     $numHidden = 0;
     foreach ($awards as $award) {
@@ -169,7 +181,7 @@ function RenderAwardGroup(array $awards, string $title, string $awardsOwnerUsern
     $imageSize = 48;
     foreach ($awards as $award) {
         if ($award['DisplayOrder'] >= 0) {
-            RenderAward($award, $imageSize, $awardsOwnerUsername, $eventData);
+            RenderAward($award, $imageSize, $awardsOwnerUsername, $eventData, $eventAwardData);
         }
     }
     echo "</div>";
@@ -192,9 +204,16 @@ function RenderCounter(string $icon, string $text, int $numItems, int $numHidden
 
 /**
  * @param Collection<int, Event> $eventData
+ * @param SupportCollection<int, Collection<int, EventAward>> $eventAwardData
  */
-function RenderAward(array $award, int $imageSize, string $ownerUsername, Collection $eventData, bool $clickable = true): void
-{
+function RenderAward(
+    array $award,
+    int $imageSize,
+    string $ownerUsername,
+    Collection $eventData,
+    SupportCollection $eventAwardData,
+    bool $clickable = true,
+): void {
     $awardType = $award['AwardType'];
     $awardType = (int) $awardType;
     $awardData = $award['AwardData'];
@@ -206,7 +225,7 @@ function RenderAward(array $award, int $imageSize, string $ownerUsername, Collec
     $awardButGameIsIncomplete = (isset($award['Incomplete']) && $award['Incomplete'] == 1);
     $imgclass = 'badgeimg siteawards';
 
-    if ($awardType == AwardType::Mastery) {
+    if ($awardType === AwardType::Mastery->toLegacyInteger()) {
         if ($awardDataExtra == '1') {
             $awarded = "Mastered on $awardDate";
             $imgclass = 'goldimage';
@@ -226,29 +245,51 @@ function RenderAward(array $award, int $imageSize, string $ownerUsername, Collec
         return;
     }
 
-    if ($awardType == AwardType::Event) {
+    if ($awardType === AwardType::Event->toLegacyInteger()) {
         $event = $eventData->find($awardData);
         if ($event) {
-            $tooltip = "Awarded for completing the {$event->title} event";
+            $tooltipTitle = $event->title;
+            $tooltipDescription = "Awarded for completing this event";
             $image = $event->image_asset_path;
 
-            if ($awardDataExtra !== 0) {
-                $eventAward = EventAward::where('event_id', $awardData)
-                    ->where('tier_index', $awardDataExtra)
-                    ->first();
+            // Use the display preference for the badge image, but always
+            // use the actual earned tier for the tooltip text. Otherwise,
+            // it's very ambiguous what tier the player is actually on if
+            // they have a saved tier preference.
+            $displayTier = (int) ($award['display_award_tier'] ?? $awardDataExtra);
+            $actualTier = (int) $awardDataExtra;
 
-                if ($eventAward) {
-                    $image = $eventAward->image_asset_path;
+            $tierIndicesToFetch = array_unique([$displayTier, $actualTier]);
+            $eventAwardsByTier = ($eventAwardData->get((int) $awardData) ?? collect())
+                ->whereIn('tier_index', $tierIndicesToFetch)
+                ->keyBy('tier_index');
 
-                    if ($eventAward->points_required < $event->legacyGame->points_total) {
-                        $tooltip = "Awarded for earning at least {$eventAward->points_required} points in the {$event->title} event";
-                    }
+            $displayEventAward = $eventAwardsByTier->get($displayTier);
+            if ($displayEventAward) {
+                $image = $displayEventAward->image_asset_path;
+            }
+
+            $actualEventAward = $eventAwardsByTier->get($actualTier);
+            if ($actualEventAward && $actualEventAward->points_required < $event->legacyGame->points_total) {
+                // Strip the event/game title prefix from the tier label to avoid duplication.
+                $tierLabel = $actualEventAward->label;
+                $gameTitle = $event->legacyGame->title ?? '';
+                if ($tierLabel !== $gameTitle && str_starts_with($tierLabel, $gameTitle)) {
+                    $tierLabel = ltrim(substr($tierLabel, strlen($gameTitle)), ' -:');
                 }
+
+                // Only append the tier label if the event title doesn't already contain it.
+                if (!str_ends_with($event->title, $tierLabel)) {
+                    $tooltipTitle = "{$event->title} - {$tierLabel}";
+                }
+
+                $pointsLabel = Str::plural('point', $actualEventAward->points_required);
+                $tooltipDescription = "Awarded for earning at least {$actualEventAward->points_required} {$pointsLabel}";
             }
 
             echo avatar('event', $event->id,
                 link: route('event.show', $event->id),
-                tooltip: "<div class='p-2 max-w-[320px] text-pretty'><span>$tooltip</span><p class='italic'>{$awardDate}</p></div>",
+                tooltip: "<div class='p-2 max-w-[320px] text-pretty text-menu-link flex flex-col gap-1'><p class='font-bold'>{$tooltipTitle}</p><span>{$tooltipDescription}</span><p class='italic'>{$awardDate}</p></div>",
                 iconUrl: media_asset($image),
                 iconSize: $imageSize,
                 iconClass: 'goldimage',
@@ -259,29 +300,50 @@ function RenderAward(array $award, int $imageSize, string $ownerUsername, Collec
         return;
     }
 
-    if ($awardType == AwardType::AchievementUnlocksYield) {
+    if ($awardType === AwardType::Playtest->toLegacyInteger()) {
+        if (!$awardGameImage) {
+            return;
+        }
+
+        $tierLine = $awardGameTitle ? "<span>{$awardGameTitle}</span>" : '';
+
+        echo avatar('playtestAward', $awardData,
+            tooltip: "<div class='p-2 max-w-[320px] text-pretty text-menu-link flex flex-col gap-1'><p class='font-bold'>Playtester Award</p>{$tierLine}<p class='italic'>{$awardDate}</p></div>",
+            iconUrl: media_asset($awardGameImage),
+            iconSize: $imageSize,
+            iconClass: 'goldimage',
+            context: $ownerUsername,
+            hasLink: false,
+        );
+
+        return;
+    }
+
+    $awardTypeEnum = AwardType::fromLegacyInteger($awardType);
+
+    if ($awardTypeEnum === AwardType::AchievementUnlocksYield) {
         // Developed a number of earned achievements
-        $tooltip = "Awarded for being a hard-working developer and producing achievements that have been earned over " . PlayerBadge::getBadgeThreshold($awardType, $awardData) . " times!";
+        $tooltip = "Awarded for being a hard-working developer and producing achievements that have been earned over " . PlayerBadge::getBadgeThreshold($awardTypeEnum, $awardData) . " times!";
         $imagepath = asset("/assets/images/badge/contribYield-$awardData.png");
         $imgclass = 'goldimage';
         $linkdest = '';
         // TBD: developer sets page?
-    } elseif ($awardType == AwardType::AchievementPointsYield) {
+    } elseif ($awardTypeEnum === AwardType::AchievementPointsYield) {
         // Yielded an amount of points earned by players
-        $tooltip = "Awarded for producing many valuable achievements, providing over " . PlayerBadge::getBadgeThreshold($awardType, $awardData) . " points to the community!";
+        $tooltip = "Awarded for producing many valuable achievements, providing over " . PlayerBadge::getBadgeThreshold($awardTypeEnum, $awardData) . " points to the community!";
         $imagepath = asset("/assets/images/badge/contribPoints-$awardData.png");
         $imgclass = 'goldimage';
         $linkdest = ''; // TBD: developer sets page?
-    // } elseif ($awardType == AwardType::Referrals) {
+    // } elseif ($awardTypeEnum === AwardType::Referrals) {
     //     $tooltip = "Referred $awardData members";
     //     $imagepath = "/Badge/00083.png";
     //     $linkdest = ''; // TBD: referrals page?
-    } elseif ($awardType == AwardType::PatreonSupporter) {
+    } elseif ($awardTypeEnum === AwardType::PatreonSupporter) {
         $tooltip = 'Awarded for being a Patreon supporter! Thank-you so much for your support!';
         $imagepath = asset('/assets/images/badge/patreon.png');
         $imgclass = 'goldimage';
         $linkdest = route('patreon-supporter.index');
-    } elseif ($awardType == AwardType::CertifiedLegend) {
+    } elseif ($awardTypeEnum === AwardType::CertifiedLegend) {
         $tooltip = 'Specially Awarded to a Certified RetroAchievements Legend';
         $imagepath = asset('/assets/images/badge/legend.png');
         $imgclass = 'goldimage';
@@ -306,6 +368,7 @@ function RenderAward(array $award, int $imageSize, string $ownerUsername, Collec
 
 /**
  * @param Collection<int, Event> $eventData
+ * @param SupportCollection<int, Collection<int, EventAward>> $eventAwardData
  */
 function RenderAwardOrderTable(
     string $title,
@@ -316,6 +379,7 @@ function RenderAwardOrderTable(
     bool $prefersSeeingSavedHiddenRows,
     int $initialSectionOrder,
     Collection $eventData,
+    SupportCollection $eventAwardData,
 ): void {
     // "Game Awards" -> "game"
     $humanReadableAwardKind = strtolower(strtok($title, " "));
@@ -360,15 +424,17 @@ function RenderAwardOrderTable(
             $awardDataExtra,
         );
 
-        if ($awardType == AwardType::Mastery) {
+        $awardTypeEnum = AwardType::fromLegacyInteger((int) $awardType);
+
+        if ($awardTypeEnum === AwardType::Mastery) {
             $awardTitle = Blade::render('<x-game-title :rawTitle="$rawTitle" />', ['rawTitle' => $awardTitle]);
-        } elseif ($awardType == AwardType::AchievementUnlocksYield) {
+        } elseif ($awardTypeEnum === AwardType::AchievementUnlocksYield) {
             $awardTitle = "Achievements Earned by Others";
-        } elseif ($awardType == AwardType::AchievementPointsYield) {
+        } elseif ($awardTypeEnum === AwardType::AchievementPointsYield) {
             $awardTitle = "Achievement Points Earned by Others";
-        } elseif ($awardType == AwardType::PatreonSupporter) {
+        } elseif ($awardTypeEnum === AwardType::PatreonSupporter) {
             $awardTitle = "Patreon Supporter";
-        } elseif ($awardType == AwardType::CertifiedLegend) {
+        } elseif ($awardTypeEnum === AwardType::CertifiedLegend) {
             $awardTitle = "Certified Legend";
         }
 
@@ -399,7 +465,7 @@ function RenderAwardOrderTable(
         HTML;
 
         echo "<td class='$subduedOpacityClassName transition'>";
-        RenderAward($award, 32, $awardOwnerUsername, $eventData, false);
+        RenderAward($award, 32, $awardOwnerUsername, $eventData, $eventAwardData, false);
         echo "</td>";
         echo "<td class='$subduedOpacityClassName transition'><span>$awardTitle</span></td>";
         echo "<td class='text-center !opacity-100'><input name='$awardCounter-is-hidden' onchange='reorderSiteAwards.handleRowHiddenCheckedChange(event, $awardCounter)' type='checkbox' " . ($isHiddenPreChecked ? "checked" : "") . "></td>";

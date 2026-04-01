@@ -19,11 +19,11 @@ import { InertiaLink } from '@/common/components/InertiaLink';
 import { PlayerGameProgressBar } from '@/common/components/PlayerGameProgressBar';
 import { SystemChip } from '@/common/components/SystemChip';
 import { WeightedPointsContainer } from '@/common/components/WeightedPointsContainer';
+import { useFormatGameReleasedAt } from '@/common/hooks/useFormatGameReleasedAt';
 import { useFormatNumber } from '@/common/hooks/useFormatNumber';
 import type { useGameBacklogState } from '@/common/hooks/useGameBacklogState';
 import { usePageProps } from '@/common/hooks/usePageProps';
 import { buildGameRarityLabel } from '@/common/utils/buildGameRarityLabel';
-import { formatGameReleasedAt } from '@/common/utils/formatGameReleasedAt';
 import { gameListFieldIconMap } from '@/features/game-list/utils/gameListFieldIconMap';
 import type { TranslatedString } from '@/types/i18next';
 
@@ -41,8 +41,9 @@ export const GameListItemDialogContent: FC<GameListItemDialogContentProps> = ({
   onToggleBacklog,
 }) => {
   const { auth } = usePageProps();
-  const { t } = useTranslation();
 
+  const { t } = useTranslation();
+  const { formatGameReleasedAt } = useFormatGameReleasedAt();
   const { formatNumber } = useFormatNumber();
 
   const { game, playerGame } = gameListEntry;
@@ -124,7 +125,7 @@ export const GameListItemDialogContent: FC<GameListItemDialogContentProps> = ({
               )}
             </DialogListItem>
 
-            <DialogListItem t_label={t('Rarity')} Icon={gameListFieldIconMap.retroRatio}>
+            <DialogListItem t_label={t('RetroRatio')} Icon={gameListFieldIconMap.retroRatio}>
               {game.pointsTotal ? (
                 <p>{buildGameRarityLabel(game.pointsTotal, game.pointsWeighted)}</p>
               ) : (

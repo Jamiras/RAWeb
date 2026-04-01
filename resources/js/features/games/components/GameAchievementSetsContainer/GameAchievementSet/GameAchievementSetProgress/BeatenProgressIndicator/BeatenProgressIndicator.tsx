@@ -1,5 +1,4 @@
 import type { FC } from 'react';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LuCircleDot, LuCircleDotDashed } from 'react-icons/lu';
 
@@ -11,10 +10,10 @@ import {
   BaseTooltipContent,
   BaseTooltipTrigger,
 } from '@/common/components/+vendor/BaseTooltip';
+import { useFormatDate } from '@/common/hooks/useFormatDate';
 import { usePageProps } from '@/common/hooks/usePageProps';
 import type { AuthenticatedUser } from '@/common/models';
 import { cn } from '@/common/utils/cn';
-import { formatDate } from '@/common/utils/l10n/formatDate';
 import { useFormatDuration } from '@/common/utils/l10n/useFormatDuration';
 import { BeatenCreditDialog } from '@/features/games/components/BeatenCreditDialog';
 
@@ -26,6 +25,7 @@ export const BeatenProgressIndicator: FC<BeatenProgressIndicatorProps> = ({ achi
   const { auth, playerGame } = usePageProps<App.Platform.Data.GameShowPageProps>();
   const { t } = useTranslation();
 
+  const { formatDate } = useFormatDate();
   const { formatDuration } = useFormatDuration();
 
   const {
@@ -37,7 +37,7 @@ export const BeatenProgressIndicator: FC<BeatenProgressIndicatorProps> = ({ achi
     unlockedProgression,
     unlockedWin,
     winConditionAchievements,
-  } = useMemo(() => getBeatenProgressData(achievements, auth?.user), [achievements, auth]);
+  } = getBeatenProgressData(achievements, auth?.user);
 
   const Icon = isBeaten ? LuCircleDot : LuCircleDotDashed;
 

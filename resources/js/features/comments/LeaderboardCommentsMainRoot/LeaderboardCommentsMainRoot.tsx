@@ -1,4 +1,4 @@
-import { type FC, memo } from 'react';
+import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CommentList } from '@/common/components/CommentList';
@@ -9,30 +9,30 @@ import { usePageProps } from '@/common/hooks/usePageProps';
 
 import { useCommentPagination } from '../hooks/useCommentPagination';
 
-export const LeaderboardCommentsMainRoot: FC = memo(() => {
+export const LeaderboardCommentsMainRoot: FC = () => {
   const { canComment, leaderboard, paginatedComments } =
-    usePageProps<App.Community.Data.LeaderboardCommentsPageProps>();
+    usePageProps<App.Community.Data.CommentPageProps>();
 
   const { t } = useTranslation();
 
   const { handleCommentDeleteSuccess, handleCommentSubmitSuccess, handlePageSelectValueChange } =
     useCommentPagination({
       paginatedComments,
-      entityId: leaderboard.id,
-      entityType: 'Leaderboard',
+      entityId: leaderboard!.id,
+      commentableType: 'leaderboard.comment',
       routeName: 'leaderboard.comment.index',
     });
 
   return (
     <div>
       <LeaderboardBreadcrumbs
-        leaderboard={leaderboard}
-        game={leaderboard.game}
-        system={leaderboard.game?.system}
+        leaderboard={leaderboard!}
+        game={leaderboard!.game}
+        system={leaderboard!.game?.system}
         t_currentPageLabel={t('Comments')}
       />
-      <GameHeading game={leaderboard.game!} wrapperClassName="!mb-1">
-        {t('Comments: {{leaderboardTitle}}', { leaderboardTitle: leaderboard.title })}
+      <GameHeading game={leaderboard!.game!} wrapperClassName="!mb-1">
+        {t('Comments: {{leaderboardTitle}}', { leaderboardTitle: leaderboard!.title })}
       </GameHeading>
 
       <div className="mb-3 flex w-full justify-between">
@@ -54,8 +54,8 @@ export const LeaderboardCommentsMainRoot: FC = memo(() => {
       <CommentList
         canComment={canComment}
         comments={paginatedComments.items}
-        commentableId={leaderboard.id}
-        commentableType="Leaderboard"
+        commentableId={leaderboard!.id}
+        commentableType="leaderboard.comment"
         onDeleteSuccess={handleCommentDeleteSuccess}
         onSubmitSuccess={handleCommentSubmitSuccess}
       />
@@ -68,4 +68,4 @@ export const LeaderboardCommentsMainRoot: FC = memo(() => {
       </div>
     </div>
   );
-});
+};

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Api\V2;
 
 use LaravelJsonApi\Core\Server\Server as BaseServer;
@@ -29,7 +31,16 @@ class Server extends BaseServer
     protected function allSchemas(): array
     {
         return [
+            Achievements\AchievementSchema::class,
+            AchievementSets\AchievementSetSchema::class,
+            GameHashes\GameHashSchema::class,
             Games\GameSchema::class,
+            Hubs\HubSchema::class,
+            LeaderboardEntries\LeaderboardEntrySchema::class,
+            Leaderboards\LeaderboardSchema::class,
+            PlayerAchievements\PlayerAchievementSchema::class,
+            PlayerAchievementSets\PlayerAchievementSetSchema::class,
+            PlayerGames\PlayerGameSchema::class,
             Systems\SystemSchema::class,
             Users\UserSchema::class,
         ];

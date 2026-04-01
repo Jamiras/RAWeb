@@ -6,10 +6,12 @@ namespace App\Models;
 
 use App\Community\Enums\AwardType;
 use App\Support\Database\Eloquent\BasePivot;
+use App\Support\Database\Eloquent\Relations\UserScopedHasManyThrough;
 use Database\Factories\PlayerGameFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -48,11 +50,26 @@ class PlayerGame extends BasePivot
     // == relations
 
     /**
+     * @return BelongsToMany<AchievementSet, $this>
+     */
+    public function achievementSets(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            AchievementSet::class,
+            'game_achievement_sets',
+            'game_id',
+            'achievement_set_id',
+            'game_id',
+            'id',
+        )->withPivot(['type', 'title', 'order_column']);
+    }
+
+    /**
      * @return HasMany<Achievement, $this>
      */
     public function achievements(): HasMany
     {
-        return $this->hasMany(Achievement::class, 'GameID', 'game_id');
+        return $this->hasMany(Achievement::class, 'game_id', 'game_id');
     }
 
     /**
@@ -60,8 +77,8 @@ class PlayerGame extends BasePivot
      */
     public function badges(): HasMany
     {
-        return $this->hasMany(PlayerBadge::class, 'AwardData', 'game_id')
-            ->whereIn('AwardType', [AwardType::GameBeaten, AwardType::Mastery]);
+        return $this->hasMany(PlayerBadge::class, 'award_key', 'game_id')
+            ->whereIn('award_type', [AwardType::GameBeaten, AwardType::Mastery]);
     }
 
     /**
@@ -86,6 +103,23 @@ class PlayerGame extends BasePivot
     public function player(): BelongsTo
     {
         return $this->user();
+    }
+
+    /**
+     * @return UserScopedHasManyThrough<PlayerAchievementSet, GameAchievementSet, PlayerGame>
+     */
+    public function playerAchievementSets(): UserScopedHasManyThrough
+    {
+        /** @var UserScopedHasManyThrough<PlayerAchievementSet, GameAchievementSet, PlayerGame> */
+        return new UserScopedHasManyThrough(
+            (new PlayerAchievementSet())->newQuery(),
+            $this,
+            new GameAchievementSet(),
+            'game_id',
+            'achievement_set_id',
+            'game_id',
+            'achievement_set_id'
+        );
     }
 
     // == scopes

@@ -1,12 +1,10 @@
 import i18n from 'i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
-import { initReactI18next } from 'react-i18next';
 
 export const createServerI18nInstance = async (locale: string) => {
   const i18nInstance = i18n.createInstance();
 
   await i18nInstance
-    .use(initReactI18next)
     .use(
       resourcesToBackend((requestedLocale: string) => {
         if (!requestedLocale.includes('_')) {
@@ -20,6 +18,7 @@ export const createServerI18nInstance = async (locale: string) => {
       lng: locale,
       fallbackLng: 'en_US',
       interpolation: { escapeValue: false },
+      showSupportNotice: false,
     });
 
   return i18nInstance;

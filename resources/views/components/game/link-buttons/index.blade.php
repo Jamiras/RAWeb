@@ -38,10 +38,10 @@ if ($canSeeOpenTickets) {
 
 <ul class="flex @if ($variant === 'stacked') flex-col @endif gap-2">
     @if (in_array('forum-topic', $allowedLinks))
-        @if ($game->ForumTopicID)
+        @if ($game->forum_topic_id)
             <x-game.link-buttons.game-link-button
                 icon="💬"
-                href="{{ route('forum-topic.show', ['topic' => $game->ForumTopicID]) }}"
+                href="{{ route('forum-topic.show', ['topic' => $game->forum_topic_id]) }}"
             >
                 Official Forum Topic
             </x-game.link-buttons.game-link-button>
@@ -52,10 +52,10 @@ if ($canSeeOpenTickets) {
         @endif
     @endif
 
-    @if (in_array('guide', $allowedLinks) && $game->GuideURL)
+    @if (in_array('guide', $allowedLinks) && $game->legacy_guide_url)
         <x-game.link-buttons.game-link-button
             icon="📖"
-            href="{{ $game->GuideURL }}"
+            href="{{ $game->legacy_guide_url }}"
         >
             Guide
         </x-game.link-buttons.game-link-button>
@@ -67,7 +67,7 @@ if ($canSeeOpenTickets) {
                 icon="💾"
                 :href="route('game.hashes.index', ['game' => $game])"
             >
-                Supported Game Files
+                Supported Game Hashes
             </x-game.link-buttons.game-link-button>
         @endcan
     @endif
@@ -100,7 +100,7 @@ if ($canSeeOpenTickets) {
         </x-game.link-buttons.game-link-button>
     @endif
 
-    @if (in_array('set-requestors', $allowedLinks) && !$game->achievements()->published()->exists())
+    @if (in_array('set-requestors', $allowedLinks) && !$game->achievements()->promoted()->exists())
         @can('viewAny', App\Models\Game::class)
             <x-game.link-buttons.game-link-button
                 icon="📜"

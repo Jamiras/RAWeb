@@ -1,4 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- this file has known type issues that are safe and part of the official Inertia.js docs
+// eslint-disable-next-line typescript/ban-ts-comment -- this file has known type issues that are safe and part of the official Inertia.js docs.
 // @ts-nocheck
 
 import { createInertiaApp } from '@inertiajs/react';
@@ -7,7 +7,6 @@ import * as Sentry from '@sentry/node';
 import dayjs from 'dayjs';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import ReactDOMServer from 'react-dom/server';
-import type { RouteName, RouteParams } from 'ziggy-js';
 
 import { route } from '../../vendor/tightenco/ziggy';
 import { AppProviders } from './common/components/AppProviders';
@@ -32,49 +31,65 @@ Sentry.init({
 });
 
 createServer(
-  (page) =>
-    createInertiaApp({
-      page,
+  async (page) => {
+    const url = page.props.ziggy?.location ?? 'unknown';
 
-      render: ReactDOMServer.renderToString,
+    Sentry.setTag('ssr.url', url);
+    Sentry.setTag('ssr.component', page.component);
 
-      title: (title) => (title && title !== appName ? `${title} · ${appName}` : appName),
+    try {
+      return await createInertiaApp({
+        page,
 
-      resolve: (name) =>
-        resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
+        render: ReactDOMServer.renderToString,
 
-      async setup({ App, props }) {
-        global.route<RouteName> = (name, params, absolute) =>
-          route(name, params as RouteParams<string & object>, absolute, {
-            ...page.props.ziggy,
-            location: new URL(page.props.ziggy.location),
-          });
+        title: (title) => (title && title !== appName ? `${title} · ${appName}` : appName),
 
-        const globalProps = props.initialPage.props as AppGlobalProps;
-        const userLocale = globalProps.auth?.user.locale ?? 'en_US';
+        resolve: (name) =>
+          resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
 
-        if (globalProps.auth?.user) {
-          Sentry.setUser({
-            id: globalProps.auth.user.id,
-            username: globalProps.auth.user.displayName,
-          });
-        }
+        async setup({ App, props }) {
+          global['route'] = (name, params, absolute) =>
+            route(name, params, absolute, {
+              ...page.props.ziggy,
+              location: new URL(page.props.ziggy.location),
+            });
 
-        // Always reset the dayjs locale state on each request.
-        // Otherwise, we may be holding on to a different user's locale
-        // setting, and the current user will get a hydration issue.
-        dayjs.locale('en');
+          const globalProps = props.initialPage.props as AppGlobalProps;
+          const userLocale = globalProps.auth?.user.locale ?? 'en_US';
 
-        const i18nInstance = await createServerI18nInstance(userLocale);
-        await loadDayjsLocale(userLocale);
+          if (globalProps.auth?.user) {
+            Sentry.setUser({
+              id: globalProps.auth.user.id,
+              username: globalProps.auth.user.displayName,
+            });
+          }
 
-        return (
-          <AppProviders i18n={i18nInstance}>
-            <App {...props} />
-          </AppProviders>
-        );
-      },
-    }),
+          // Always reset the dayjs locale state on each request.
+          // Otherwise, we may be holding on to a different user's locale
+          // setting, and the current user will get a hydration issue.
+          dayjs.locale('en');
+
+          const i18nInstance = await createServerI18nInstance(userLocale);
+          await loadDayjsLocale(userLocale);
+
+          return (
+            <AppProviders i18n={i18nInstance}>
+              <App {...props} />
+            </AppProviders>
+          );
+        },
+      });
+    } catch (error) {
+      // Prepend the URL to the error message so it appears in server logs.
+      // Otherwise, we can't trace the URL the error came from for debugging.
+      if (error instanceof Error) {
+        error.message = `[SSR ${url}] ${error.message}`;
+      }
+
+      throw error;
+    }
+  },
   {
     cluster: false, // enabling this seems to hurt perf more than help it on prod
     port: inertiaDaemonPort,

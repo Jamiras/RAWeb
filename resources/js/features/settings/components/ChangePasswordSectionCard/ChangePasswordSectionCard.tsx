@@ -34,7 +34,7 @@ export const ChangePasswordSectionCard: FC = () => {
     >
       <div className="@container">
         <div className="flex flex-col gap-5">
-          {/* 
+          {/*
             Included for a11y. This helps some password managers suggest new passwords.
             @see https://www.chromium.org/developers/design-documents/create-amazing-password-forms/#use-hidden-fields-for-implicit-information
           */}
@@ -87,12 +87,14 @@ export const ChangePasswordSectionCard: FC = () => {
                       placeholder={t('enter a new password here...')}
                       autoComplete="new-password"
                       required
-                      minLength={8}
+                      minLength={10}
                       {...field}
                     />
                   </BaseFormControl>
 
-                  <BaseFormDescription>{t('Must be at least 8 characters.')}</BaseFormDescription>
+                  <BaseFormDescription>
+                    {t('Must be at least {{val, number}} characters.', { val: 10 })}
+                  </BaseFormDescription>
 
                   <BaseFormMessage />
                 </div>
@@ -116,7 +118,7 @@ export const ChangePasswordSectionCard: FC = () => {
                       placeholder={t('confirm your new password here...')}
                       autoComplete="new-password"
                       required
-                      minLength={8}
+                      minLength={10}
                       {...field}
                     />
                   </BaseFormControl>

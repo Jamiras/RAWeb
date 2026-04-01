@@ -1,25 +1,24 @@
 <?php
 
-use App\Community\Enums\ArticleType;
+use App\Community\Enums\CommentableType;
 use App\Community\Enums\SubscriptionSubjectType;
 use App\Community\Services\SubscriptionNotificationService;
 use App\Community\Services\SubscriptionService;
 use App\Enums\UserPreference;
-use App\Mail\CommunityActivityMail;
-use App\Mail\ValidateUserEmailMail;
 use App\Models\Achievement;
 use App\Models\Comment;
 use App\Models\Game;
 use App\Models\Leaderboard;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Notifications\Auth\ValidateUserEmailNotification;
+use App\Notifications\Community\CommunityActivityNotification;
 use Aws\CommandPool;
 use Illuminate\Contracts\Mail\Mailer as MailerContract;
 use Illuminate\Mail\Mailer;
 use Illuminate\Mail\Transport\SesTransport;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mime\Email;
 
 function mail_utf8(string $to, string $subject = '(No subject)', string $message = ''): bool
@@ -160,14 +159,14 @@ function sendValidationEmail(User $user, string $email): bool
     // This generates and stores (and returns) a new email validation string in the DB.
     $strValidation = generateEmailVerificationToken($user);
 
-    Mail::to($email)->queue(new ValidateUserEmailMail($user, $strValidation));
+    $user->notify(new ValidateUserEmailNotification($strValidation));
 
     return true;
 }
 
 function informAllSubscribersAboutActivity(
-    int $articleType,
-    int $articleID,
+    CommentableType $commentableType,
+    int $commentableId,
     User $activityAuthor,
     int $commentID,
     ?string $onBehalfOfUser = null,
@@ -178,34 +177,34 @@ function informAllSubscribersAboutActivity(
     $articleEmailPreference = UserPreference::EmailOn_ActivityComment;
     $subscriptionSubjectType = null;
 
-    switch ($articleType) {
-        case ArticleType::Game:
-            $game = Game::with('system')->find($articleID);
+    switch ($commentableType) {
+        case CommentableType::Game:
+            $game = Game::with('system')->find($commentableId);
             if (!$game) {
                 return;
             }
 
-            $articleTitle = "{$game->Title} ({$game->system->Name})";
+            $articleTitle = "{$game->title} ({$game->system->name})";
             $urlTarget = route('game.show', ['game' => $game, 'tab' => 'community']);
             $articleEmailPreference = UserPreference::EmailOn_AchievementComment;
             $subscriptionSubjectType = SubscriptionSubjectType::GameWall;
             break;
 
-        case ArticleType::Achievement:
-            $achievement = Achievement::with(['game', 'developer'])->find($articleID);
+        case CommentableType::Achievement:
+            $achievement = Achievement::with(['game', 'developer'])->find($commentableId);
             if (!$achievement) {
                 return;
             }
 
-            $articleTitle = "{$achievement->Title} ({$achievement->game->Title})";
+            $articleTitle = "{$achievement->title} ({$achievement->game->title})";
             $urlTarget = route('achievement.show', $achievement);
             $subjectAuthor = $achievement->developer;
             $articleEmailPreference = UserPreference::EmailOn_AchievementComment;
             $subscriptionSubjectType = SubscriptionSubjectType::Achievement;
             break;
 
-        case ArticleType::User:  // User wall
-            $wallUser = User::find($articleID);
+        case CommentableType::User:  // User wall
+            $wallUser = User::find($commentableId);
             if (!$wallUser) {
                 return;
             }
@@ -217,30 +216,27 @@ function informAllSubscribersAboutActivity(
             $subscriptionSubjectType = SubscriptionSubjectType::UserWall;
             break;
 
-        case ArticleType::News:  // News
-            break;
-
-        case ArticleType::Leaderboard:  // Leaderboard
+        case CommentableType::Leaderboard:  // Leaderboard
             // note: cannot currently explicitly subscribe to leaderboard
-            $leaderboard = Leaderboard::with('game')->find($articleID);
+            $leaderboard = Leaderboard::with('game')->find($commentableId);
             if (!$leaderboard) {
                 return;
             }
 
-            $articleTitle = "{$leaderboard->Title} ({$leaderboard->game->Title})";
-            $urlTarget = "leaderboardinfo.php?i=$articleID";
+            $articleTitle = "{$leaderboard->title} ({$leaderboard->game->title})";
+            $urlTarget = "leaderboardinfo.php?i=$commentableId";
             $articleEmailPreference = UserPreference::EmailOn_AchievementComment;
             $subscriptionSubjectType = SubscriptionSubjectType::Leaderboard;
             break;
 
-        case ArticleType::AchievementTicket:  // Ticket
-            $ticket = Ticket::with(['achievement.game', 'reporter'])->find($articleID);
+        case CommentableType::AchievementTicket:  // Ticket
+            $ticket = Ticket::with(['achievement.game', 'reporter'])->find($commentableId);
             if (!$ticket) {
                 return;
             }
 
-            $articleTitle = "{$ticket->achievement->Title} ({$ticket->achievement->game->Title})";
-            $urlTarget = route('ticket.show', ['ticket' => $ticket->ID]);
+            $articleTitle = "{$ticket->achievement->title} ({$ticket->achievement->game->title})";
+            $urlTarget = route('ticket.show', ['ticket' => $ticket->id]);
             $subjectAuthor = $ticket->reporter;
             $articleEmailPreference = UserPreference::EmailOn_TicketActivity;
             $subscriptionSubjectType = SubscriptionSubjectType::AchievementTicket;
@@ -263,7 +259,7 @@ function informAllSubscribersAboutActivity(
     if ($commentID > 0) {
         // For supported comment types, use the intelligent redirect route that
         // handles pagination correctly. For other types (like tickets), append the anchor directly.
-        if (ArticleType::supportsCommentRedirect($articleType)) {
+        if ($commentableType->supportsCommentRedirect()) {
             $urlTarget = route('comment.show', ['comment' => $commentID]);
         } else {
             $urlTarget .= "#comment_$commentID";
@@ -278,17 +274,17 @@ function informAllSubscribersAboutActivity(
             if ($comment->user->created_at->diffInDays() >= 1
                 && ($comment->user->playerSessions()->where('duration', '>', 5)->exists()
                     || $comment->user->playerAchievementSets()->where('time_taken', '>', 5)->exists())) {
-                $payload = nl2br($comment->Payload);
+                $payload = nl2br($comment->body);
             }
         }
     }
 
     $subscriptionService = new SubscriptionService();
-    $subscribers = $subscriptionService->getSegmentedSubscriberIds($subscriptionSubjectType, $articleID, $subjectAuthor?->ID);
+    $subscribers = $subscriptionService->getSegmentedSubscriberIds($subscriptionSubjectType, $commentableId, $subjectAuthor?->id);
 
     $notificationService = new SubscriptionNotificationService();
     $notificationService->queueNotifications($subscribers['implicitlySubscribedNotifyLater'],
-        $subscriptionSubjectType, $articleID, $commentID, $articleEmailPreference);
+        $subscriptionSubjectType, $commentableId, $commentID, $articleEmailPreference);
 
     $emailTargets = $notificationService->getEmailTargets(
         array_merge($subscribers['explicitlySubscribed'], $subscribers['implicitlySubscribedNotifyNow']),
@@ -301,9 +297,9 @@ function informAllSubscribersAboutActivity(
 
         sendActivityEmail(
             $subscriber,
-            $articleID,
+            $commentableId,
             $activityAuthor,
-            $articleType,
+            $commentableType,
             $articleTitle,
             $urlTarget,
             $isThirdParty,
@@ -316,7 +312,7 @@ function sendActivityEmail(
     User $user,
     int $actID,
     ?User $activityCommenter,
-    int $articleType,
+    CommentableType $commentableType,
     string $articleTitle,
     string $urlTarget,
     bool $threadInvolved = false,
@@ -326,16 +322,15 @@ function sendActivityEmail(
         $user->is($activityCommenter)
         || $user->isGone()
         || $user->isInactive()
-        || empty($user->EmailAddress)
+        || empty($user->email)
     ) {
         return false;
     }
 
-    Mail::to($user->EmailAddress)->queue(new CommunityActivityMail(
-        $user,
+    $user->notify(new CommunityActivityNotification(
         $actID,
-        $activityCommenter?->display_name ?? $activityCommenter?->User,
-        $articleType,
+        $activityCommenter?->display_name ?? $activityCommenter?->username,
+        $commentableType,
         $articleTitle,
         $urlTarget,
         $threadInvolved,

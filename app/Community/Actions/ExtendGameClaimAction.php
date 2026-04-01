@@ -4,33 +4,42 @@ declare(strict_types=1);
 
 namespace App\Community\Actions;
 
-use App\Community\Enums\ArticleType;
+use App\Community\Enums\CommentableType;
 use App\Models\AchievementSetClaim;
 use App\Models\User;
 use App\Support\Cache\CacheKey;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ExtendGameClaimAction
 {
     public function execute(AchievementSetClaim $claim, User $actingUser): void
     {
-        $claim->Finished = $claim->Finished->addMonths(3);
-        $claim->Extension++;
+        $claim->finished_at = $claim->finished_at->addMonths(3);
+        $claim->extensions_count++;
         $claim->save();
 
-        Cache::forget(CacheKey::buildUserExpiringClaimsCacheKey($claim->user->User));
-        addArticleComment("Server", ArticleType::SetClaim, $claim->game->ID, "Claim extended by " . $actingUser->display_name);
+        Cache::forget(CacheKey::buildUserExpiringClaimsCacheKey($claim->user->username));
+        addArticleComment("Server", CommentableType::SetClaim, $claim->game->id, "Claim extended by " . $actingUser->display_name);
 
         $webhookUrl = config('services.discord.webhook.claims');
         if (!empty($webhookUrl)) {
-            $payload = [
-                'username' => 'Claim Bot',
-                'avatar_url' => media_asset('UserPic/QATeam.png'),
-                'content' => route('game.show', $claim->game) . "\n:timer: " .
-                            "Claim extended by " . $actingUser->display_name,
-            ];
-            (new Client())->post($webhookUrl, ['json' => $payload]);
+            try {
+                $payload = [
+                    'username' => 'Claim Bot',
+                    'avatar_url' => media_asset('UserPic/QATeam.png'),
+                    'content' => route('game.show', $claim->game) . "\n:timer: " .
+                                "Claim extended by " . $actingUser->display_name,
+                ];
+                (new Client())->post($webhookUrl, ['json' => $payload]);
+            } catch (Throwable $e) {
+                Log::warning('Failed to send Discord webhook for claim extension.', [
+                    'claim_id' => $claim->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $collaborationClaims = $claim->game->achievementSetClaims()
@@ -39,12 +48,12 @@ class ExtendGameClaimAction
             ->with('user')
             ->get();
         foreach ($collaborationClaims as $collaborationClaim) {
-            $collaborationClaim->Finished = $claim->Finished;
-            $collaborationClaim->Extension++;
+            $collaborationClaim->finished_at = $claim->finished_at;
+            $collaborationClaim->extensions_count++;
             $collaborationClaim->save();
 
-            Cache::forget(CacheKey::buildUserExpiringClaimsCacheKey($collaborationClaim->user->User));
-            addArticleComment("Server", ArticleType::SetClaim, $claim->game->ID,
+            Cache::forget(CacheKey::buildUserExpiringClaimsCacheKey($collaborationClaim->user->username));
+            addArticleComment("Server", CommentableType::SetClaim, $claim->game->id,
                 $collaborationClaim->user->display_name . "'s collaboration claim extended by " . $actingUser->display_name);
         }
     }

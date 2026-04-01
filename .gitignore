@@ -11,6 +11,7 @@
 /public/filament.hot
 /public/hot
 /public/vendor/filament
+/public/vendor/livewire
 
 # Generated files
 _ide_helper_models.php
@@ -55,7 +56,6 @@ Homestead.yaml
 # Caches
 *.tsbuildinfo
 .deptrac.cache
-.eslintcache
 /.pnpm-store
 
 # IDE and editor
@@ -66,13 +66,22 @@ Homestead.yaml
 /.nova
 /.project
 /.settings
-/.vscode
+/.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 nbproject
 
 # Docker and local dev
 /.vagrant
 /docker/nginx/logs
 /tmp
+
+# FrankenPHP / Octane
+/Caddyfile
+/Caddyfile.template
+/config/caddy/
+/data/caddy/
+/frankenphp
 
 # OS files
 ._*

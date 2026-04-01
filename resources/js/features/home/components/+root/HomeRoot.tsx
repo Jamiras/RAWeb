@@ -1,19 +1,20 @@
-import { type FC, memo } from 'react';
+import type { FC } from 'react';
 
 import { usePageProps } from '@/common/hooks/usePageProps';
 
 import { ActivePlayers } from './ActivePlayers';
 import { CurrentlyOnline } from './CurrentlyOnline';
 import { FrontPageNews } from './FrontPageNews';
+import { GameActivity } from './GameActivity';
 import { GuestWelcomeCta } from './GuestWelcomeCta';
 import { NewSetsList } from './NewSetsList';
 import { NewUserCta } from './NewUserCta';
 import { RecentForumPosts } from './RecentForumPosts';
 import { SetsInProgressList } from './SetsInProgressList';
-import { TrendingRightNow } from './TrendingRightNow';
 import { UserCurrentGame } from './UserCurrentGame';
+import { WiiLaunchBanner } from './WiiLaunchBanner';
 
-export const HomeRoot: FC = memo(() => {
+export const HomeRoot: FC = () => {
   const { auth, userCurrentGame, userCurrentGameMinutesAgo } =
     usePageProps<App.Http.Data.HomePageProps>();
 
@@ -21,7 +22,11 @@ export const HomeRoot: FC = memo(() => {
     <div className="flex flex-col gap-6">
       {!auth?.user ? <GuestWelcomeCta /> : null}
 
-      {userCurrentGame && userCurrentGameMinutesAgo !== null ? <UserCurrentGame /> : null}
+      {userCurrentGame && userCurrentGameMinutesAgo !== null ? (
+        <UserCurrentGame />
+      ) : (
+        <WiiLaunchBanner />
+      )}
 
       {auth?.user?.isNew ? <NewUserCta /> : null}
 
@@ -34,7 +39,7 @@ export const HomeRoot: FC = memo(() => {
       <ActivePlayers />
 
       <div className="mb-4">
-        <TrendingRightNow />
+        <GameActivity />
       </div>
 
       <CurrentlyOnline />
@@ -42,4 +47,4 @@ export const HomeRoot: FC = memo(() => {
       <RecentForumPosts />
     </div>
   );
-});
+};

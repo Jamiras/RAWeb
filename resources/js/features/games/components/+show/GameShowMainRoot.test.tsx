@@ -16,16 +16,6 @@ import { currentListViewAtom } from '../../state/games.atoms';
 import { GameShowMainRoot } from './GameShowMainRoot';
 
 describe('Component: GameShowMainRoot', () => {
-  beforeEach(() => {
-    const mockIntersectionObserver = vi.fn();
-    mockIntersectionObserver.mockReturnValue({
-      observe: () => null,
-      unobserve: () => null,
-      disconnect: () => null,
-    });
-    window.IntersectionObserver = mockIntersectionObserver;
-  });
-
   it('renders without crashing', () => {
     // ARRANGE
     const game = createGame({
@@ -89,21 +79,17 @@ describe('Component: GameShowMainRoot', () => {
     expect(screen.queryByTestId('game-show')).not.toBeInTheDocument();
   });
 
-  it('given the game has all required media, shows an accessible heading', () => {
+  it('given the system has screenshot resolutions, passes expected dimensions to the media component', () => {
     // ARRANGE
     const game = createGame({
       badgeUrl: 'badge.jpg',
       gameAchievementSets: [createGameAchievementSet({ achievementSet: createAchievementSet() })],
-      imageBoxArtUrl: faker.internet.url(),
-      imageTitleUrl: faker.internet.url(),
-      imageIngameUrl: faker.internet.url(),
-
       system: createSystem({
         iconUrl: 'icon.jpg',
-        name: 'Nintendo Switch',
+        screenshotResolutions: [{ width: 256, height: 224 }],
       }),
-
-      title: 'Super Mario Odyssey',
+      imageIngameUrl: 'ingame.jpg',
+      imageTitleUrl: 'title.jpg',
     });
 
     render(<GameShowMainRoot />, {
@@ -123,7 +109,9 @@ describe('Component: GameShowMainRoot', () => {
     });
 
     // ASSERT
-    expect(screen.getByRole('heading', { name: 'Super Mario Odyssey' })).toBeVisible();
+    const ingameImage = screen.getByRole('img', { name: /ingame screenshot/i });
+    expect(ingameImage).toHaveAttribute('width', '256');
+    expect(ingameImage).toHaveAttribute('height', '224');
   });
 
   it('given the game has media URLs, shows them in the desktop media viewer', () => {

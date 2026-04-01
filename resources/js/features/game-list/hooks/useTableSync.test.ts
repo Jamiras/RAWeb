@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import type {
   ColumnFiltersState,
   PaginationState,
@@ -14,6 +13,7 @@ const defaultColumnFilters: ColumnFiltersState = [{ id: 'achievementsPublished',
 
 describe('Hook: useTableSync', () => {
   let cookieSpy: ReturnType<typeof vi.spyOn>;
+  let pushStateSpy: ReturnType<typeof vi.spyOn>;
   let originalLocation: Location;
 
   beforeEach(() => {
@@ -28,11 +28,18 @@ describe('Hook: useTableSync', () => {
 
     // Mock document.cookie for persistence tests.
     cookieSpy = vi.spyOn(document, 'cookie', 'set');
+
+    // Mock window.history.pushState for URL update tests.
+    pushStateSpy = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    window.location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: originalLocation,
+    });
     cookieSpy.mockRestore();
+    pushStateSpy.mockRestore();
   });
 
   it('renders without crashing', () => {
@@ -74,7 +81,7 @@ describe('Hook: useTableSync', () => {
     );
 
     // ASSERT
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
   });
 
   it('given the user advances from page 1 to page 2, updates URL params correctly', () => {
@@ -97,11 +104,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?page[number]=2'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?page[number]=2'),
+    );
   });
 
   it('given the user goes from page 2 to page 1, updates URL params correctly', () => {
@@ -125,11 +132,7 @@ describe('Hook: useTableSync', () => {
 
     // ASSERT
     // Don't send a param on page 1.
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given the user changes the sort order, updates URL params correctly', () => {
@@ -152,11 +155,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?sort=-system'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?sort=-system'),
+    );
   });
 
   it('given the user sorts by title ascending, updates URL params correctly by removing the sort order', () => {
@@ -180,11 +183,7 @@ describe('Hook: useTableSync', () => {
 
     // ASSERT
     // Don't send a param on the default sort order.
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given the user filters by a system, updates URL params correctly', () => {
@@ -210,11 +209,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[system]=1'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[system]=1'),
+    );
   });
 
   it('given the user filters by multiple systems, updates URL params correctly', () => {
@@ -241,11 +240,11 @@ describe('Hook: useTableSync', () => {
 
     // ASSERT
     const filterValue = '1%2C5';
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[system]=') + filterValue,
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[system]=') + filterValue,
+    );
   });
 
   it('given the user clears their filters, removes them from query params', () => {
@@ -271,11 +270,7 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given the user sets the achievements published filter to "none", updates URL params correctly', () => {
@@ -297,11 +292,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[achievementsPublished]=none'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[achievementsPublished]=none'),
+    );
   });
 
   it('given the user sets the achievements published filter to "has", removes it from the query params', () => {
@@ -324,11 +319,7 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given a non-array filter value is set to empty, removes it from query params', () => {
@@ -357,11 +348,7 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given a non-array filter value matches the default, removes it from query params', () => {
@@ -393,11 +380,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[achievementsPublished]=has'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[achievementsPublished]=has'),
+    );
   });
 
   it('given a non-array filter value differs from default, includes it in query params', () => {
@@ -432,11 +419,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[achievementsPublished]=has&filter[title]=new-value'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[achievementsPublished]=has&filter[title]=new-value'),
+    );
   });
 
   it('given arrays of different lengths, treats them as non-matching filters', () => {
@@ -467,11 +454,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: '/games?filter%5Bplatform%5D=1%2C2',
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      '/games?filter%5Bplatform%5D=1%2C2',
+    );
   });
 
   it('given user persistence is enabled, saves table state to the cookie', () => {
@@ -663,11 +650,11 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?page[size]=50'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?page[size]=50'),
+    );
   });
 
   it('given the user changes the sort direction to ascending, updates URL params correctly', () => {
@@ -690,11 +677,62 @@ describe('Hook: useTableSync', () => {
 
     // ASSERT
     // No minus prefix on "system" when using ascending sort.
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?sort=system'),
-      preserveScroll: true,
-      preserveState: true,
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?sort=system'),
+    );
+  });
+
+  it('given the sorting array is empty, does not include a sort param in the URL', () => {
+    // ARRANGE
+    const columnFilters: ColumnFiltersState = [];
+    const pagination: PaginationState = { pageIndex: 0, pageSize: 25 };
+    const sorting: SortingState = [{ id: 'title', desc: false }];
+
+    const { rerender } = renderHook((props: any) => useTableSync(props), {
+      initialProps: { columnFilters, pagination, sorting },
     });
+
+    // ACT
+    const emptySorting: SortingState = [];
+    rerender({
+      columnFilters,
+      pagination,
+      sorting: emptySorting,
+    });
+
+    // ASSERT
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
+  });
+
+  it('given the active sort matches the default sort, removes sort from URL params', () => {
+    // ARRANGE
+    const columnFilters: ColumnFiltersState = [];
+    const pagination: PaginationState = { pageIndex: 0, pageSize: 25 };
+    const sorting: SortingState = [{ id: 'title', desc: true }];
+    const defaultColumnSort = { id: 'title', desc: true };
+
+    const { rerender } = renderHook((props: any) => useTableSync(props), {
+      initialProps: {
+        columnFilters,
+        pagination,
+        sorting,
+        defaultColumnSort,
+      },
+    });
+
+    // ACT
+    const updatedSorting: SortingState = [{ id: 'title', desc: true }];
+    rerender({
+      columnFilters,
+      pagination,
+      sorting: updatedSorting,
+      defaultColumnSort,
+    });
+
+    // ASSERT
+    expect(pushStateSpy).toHaveBeenCalledWith({ inertia: true }, '', encodeURI('/games'));
   });
 
   it('given inactive filters are present in the URL, removes them when updating params', () => {
@@ -723,11 +761,11 @@ describe('Hook: useTableSync', () => {
 
     // ASSERT
     // oldParam is removed.
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[system]=1'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[system]=1'),
+    );
   });
 
   it('given a filter value has a different length than the default filter value, treats them as different values', () => {
@@ -756,10 +794,10 @@ describe('Hook: useTableSync', () => {
     });
 
     // ASSERT
-    expect(router.replace).toHaveBeenCalledWith({
-      url: encodeURI('/games?filter[system]=1'),
-      preserveScroll: true,
-      preserveState: true,
-    });
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { inertia: true },
+      '',
+      encodeURI('/games?filter[system]=1'),
+    );
   });
 });

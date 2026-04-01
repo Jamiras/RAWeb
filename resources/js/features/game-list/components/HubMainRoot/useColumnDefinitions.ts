@@ -1,5 +1,4 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RouteName } from 'ziggy-js';
 
@@ -25,92 +24,86 @@ export function useColumnDefinitions(options: {
   canSeeOpenTicketsColumn: boolean;
   forUsername?: string;
 }): ColumnDef<App.Platform.Data.GameListEntry>[] {
-  const { auth } = usePageProps();
+  const { auth, hub } = usePageProps<App.Platform.Data.HubPageProps>();
+  const { t, i18n } = useTranslation();
 
-  const { hub } = usePageProps<App.Platform.Data.HubPageProps>();
+  const tableApiRouteParams = { gameSet: hub.id };
 
-  const { t } = useTranslation();
+  const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
+    buildTitleColumnDef({
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('Title'),
+      forUsername: options.forUsername,
+    }),
+    buildSystemColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('System') }),
+    buildAchievementsPublishedColumnDef({
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('Achievements'),
+    }),
+    buildPointsTotalColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('Points') }),
+    buildRetroRatioColumnDef({
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('RetroRatio'),
+      strings: { t_none: t('none') },
+    }),
+    buildLastUpdatedColumnDef({
+      locale: i18n.language,
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('Last Updated'),
+    }),
+    buildReleasedAtColumnDef({
+      locale: i18n.language,
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('Release Date'),
+      strings: { t_unknown: t('unknown') },
+    }),
+    buildPlayersTotalColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('Players') }),
+    buildNumVisibleLeaderboardsColumnDef({
+      tableApiRouteName,
+      tableApiRouteParams,
+      t_label: t('Leaderboards'),
+    }),
+  ];
 
-  const columnDefinitions = useMemo(() => {
-    const tableApiRouteParams = { gameSet: hub.id };
-
-    const columns: ColumnDef<App.Platform.Data.GameListEntry>[] = [
-      buildTitleColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-        t_label: t('Title'),
-        forUsername: options.forUsername,
-      }),
-      buildSystemColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('System') }),
-      buildAchievementsPublishedColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-        t_label: t('Achievements'),
-      }),
-      buildPointsTotalColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('Points') }),
-      buildRetroRatioColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-        t_label: t('Rarity'),
-        strings: { t_none: t('none') },
-      }),
-      buildLastUpdatedColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-        t_label: t('Last Updated'),
-      }),
-      buildReleasedAtColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-
-        t_label: t('Release Date'),
-        strings: { t_unknown: t('unknown') },
-      }),
-      buildPlayersTotalColumnDef({ tableApiRouteName, tableApiRouteParams, t_label: t('Players') }),
-      buildNumVisibleLeaderboardsColumnDef({
-        tableApiRouteName,
-        tableApiRouteParams,
-        t_label: t('Leaderboards'),
-      }),
-    ];
-
-    if (options.canSeeOpenTicketsColumn) {
-      columns.push(
-        buildNumUnresolvedTicketsColumnDef({
-          tableApiRouteName,
-          tableApiRouteParams,
-          t_label: t('Tickets'),
-        }),
-      );
-    }
-
-    if (auth?.user) {
-      columns.push(
-        buildPlayerGameProgressColumnDef({
-          tableApiRouteName,
-          tableApiRouteParams,
-          t_label: t('Progress'),
-        }),
-      );
-    }
-
+  if (options.canSeeOpenTicketsColumn) {
     columns.push(
-      ...([
-        buildHasActiveOrInReviewClaimsColumnDef({
-          tableApiRouteName,
-          tableApiRouteParams,
-          t_label: t('Claimed'),
-          strings: {
-            t_no: t('No'),
-            t_yes: t('Yes'),
-          },
-        }),
-        buildRowActionsColumnDef({ shouldAnimateBacklogIconOnChange: true }),
-      ] satisfies ColumnDef<App.Platform.Data.GameListEntry>[]),
+      buildNumUnresolvedTicketsColumnDef({
+        tableApiRouteName,
+        tableApiRouteParams,
+        t_label: t('Tickets'),
+      }),
     );
+  }
 
-    return columns;
-  }, [auth?.user, hub.id, options.canSeeOpenTicketsColumn, options.forUsername, t]);
+  if (auth?.user) {
+    columns.push(
+      buildPlayerGameProgressColumnDef({
+        tableApiRouteName,
+        tableApiRouteParams,
+        t_label: t('Progress'),
+      }),
+    );
+  }
 
-  return columnDefinitions;
+  columns.push(
+    ...([
+      buildHasActiveOrInReviewClaimsColumnDef({
+        tableApiRouteName,
+        tableApiRouteParams,
+        t_label: t('Claimed'),
+        strings: {
+          t_no: t('No'),
+          t_yes: t('Yes'),
+        },
+      }),
+      buildRowActionsColumnDef({ shouldAnimateBacklogIconOnChange: true }),
+    ] satisfies ColumnDef<App.Platform.Data.GameListEntry>[]),
+  );
+
+  return columns;
 }

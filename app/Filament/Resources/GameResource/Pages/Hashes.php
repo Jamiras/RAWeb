@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\GameResource\Pages;
 
-use App\Community\Enums\ArticleType;
+use App\Community\Enums\CommentableType;
 use App\Enums\GameHashCompatibility;
 use App\Filament\Resources\GameHashResource;
 use App\Filament\Resources\GameResource;
@@ -23,7 +23,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Livewire;
 
 class Hashes extends ManageRelatedRecords
 {
@@ -54,16 +53,21 @@ class Hashes extends ManageRelatedRecords
         return $user->can('manage', GameHash::class);
     }
 
-    public static function getNavigationBadge(): ?string
+    public static function getNavigationItems(array $urlParameters = []): array
     {
-        return (string) Livewire::current()->getRecord()->hashes->count();
+        $item = parent::getNavigationItems($urlParameters)[0];
+        if (($record = $urlParameters['record'] ?? null) instanceof Game) {
+            $item->badge((string) $record->hashes->count());
+        }
+
+        return [$item];
     }
 
     public function table(Table $table): Table
     {
         // TODO migrate to filament-comments
-        $nonAutomatedCommentsCount = Comment::where('ArticleType', ArticleType::GameHash)
-            ->where('ArticleID', $this->getOwnerRecord()->id)
+        $nonAutomatedCommentsCount = Comment::where('commentable_type', CommentableType::GameHash)
+            ->where('commentable_id', $this->getOwnerRecord()->id)
             ->notAutomated()
             ->count();
 
@@ -207,7 +211,7 @@ class Hashes extends ManageRelatedRecords
 
                         addArticleComment(
                             "Server",
-                            ArticleType::GameHash,
+                            CommentableType::GameHash,
                             $gameId,
                             "{$md5} unlinked by {$user->display_name}"
                         );

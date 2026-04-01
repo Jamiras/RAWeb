@@ -136,9 +136,9 @@ class SummarizeGameStats extends Command
         $game = Game::find($id);
         if ($game) {
             return [
-                $this->gameIdIndex => $game->ID,
-                $this->titleIndex => $game->Title,
-                $this->consoleIndex => $game->ConsoleID,
+                $this->gameIdIndex => $game->id,
+                $this->titleIndex => $game->title,
+                $this->consoleIndex => $game->system_id,
             ];
         }
 
@@ -148,19 +148,19 @@ class SummarizeGameStats extends Command
     public function summarize(): void
     {
         $numSubsets = count($this->allSubsets);
-        $numGames = Game::whereNotIn('ConsoleId', System::getNonGameSystems())->count() - $numSubsets;
+        $numGames = Game::whereNotIn('system_id', System::getNonGameSystems())->count() - $numSubsets;
 
-        $numAchievements = Game::whereIn('ID', $this->allGameIds)->sum('achievements_published');
+        $numAchievements = Game::whereIn('id', $this->allGameIds)->sum('achievements_published');
 
-        $numSubsetAchievements = Game::whereIn('ID', $this->allSubsetIds)->sum('achievements_published');
+        $numSubsetAchievements = Game::whereIn('id', $this->allSubsetIds)->sum('achievements_published');
 
-        $numLeaderboards = DB::table('LeaderboardDef')->count();
-        $numGamesWithLeaderboards = DB::table('LeaderboardDef')->distinct()->count('GameID');
-        $numRichPresences = Game::whereRaw('LENGTH(RichPresencePatch) > 1')->count();
-        $numDynamicRichPresences = Game::where('RichPresencePatch', 'LIKE', '%@%')->count();
+        $numLeaderboards = DB::table('leaderboards')->count();
+        $numGamesWithLeaderboards = DB::table('leaderboards')->distinct()->count('game_id');
+        $numRichPresences = Game::whereRaw('LENGTH(trigger_definition) > 1')->count();
+        $numDynamicRichPresences = Game::where('trigger_definition', 'LIKE', '%@%')->count();
         $numStaticRichPresences = $numRichPresences - $numDynamicRichPresences;
-        $numAuthors = Achievement::published()->distinct('user_id')->count('user_id');
-        $numSystems = System::whereNotIn('ID', System::getNonGameSystems())->count();
+        $numAuthors = Achievement::promoted()->distinct('user_id')->count('user_id');
+        $numSystems = System::whereNotIn('id', System::getNonGameSystems())->count();
 
         echo "Games:         " . str_pad((string) $numGames, 6, ' ', STR_PAD_LEFT) . "\r\n";
         echo "Achievements:  " . str_pad((string) $numAchievements, 6, ' ', STR_PAD_LEFT);
@@ -506,7 +506,7 @@ class SummarizeGameStats extends Command
         $numFirstGames = 0;
 
         $threshold = Carbon::now()->subMonths(1);
-        foreach (User::where('Created', '>=', $threshold)->pluck('ID') as $userId) {
+        foreach (User::where('created_at', '>=', $threshold)->pluck('id') as $userId) {
             $query = PlayerAchievementSet::where('user_id', $userId)
                 ->where('created_at', '>=', $threshold)
                 ->where('time_taken', '>=', 5)
@@ -568,7 +568,7 @@ class SummarizeGameStats extends Command
 
         $query = PlayerGame::where('completed_hardcore_at', '>', Carbon::now()->subMonths(6))
             ->whereIn('user_id', function ($query) {
-                $query->select('ID')->from('UserAccounts')->where('Created', '>', Carbon::now()->subMonths(6));
+                $query->select('id')->from('users')->where('created_at', '>', Carbon::now()->subMonths(6));
             })
             ->orderByDesc('completed_hardcore_at')
             ->select(['user_id', 'game_id']);
@@ -611,21 +611,21 @@ class SummarizeGameStats extends Command
         echo "```\r\n\r\n";
     }
 
-    private function mostAwards(int $type, int $extra, ?Carbon $after, int $count): void
+    private function mostAwards(AwardType $type, int $extra, ?Carbon $after, int $count): void
     {
-        $query = "SELECT a.AwardData AS game_id, count(*) AS num
-                  FROM SiteAwards a
-                  JOIN GameData g ON g.ID=a.AwardData
-                  WHERE a.AwardType=$type
-                  AND a.AwardDataExtra=$extra
-                  AND g.ConsoleID NOT IN (100, 101)
-                  AND g.Title NOT LIKE '%[Subset - %' ";
+        $query = "SELECT a.award_key AS game_id, count(*) AS num
+                  FROM user_awards a
+                  JOIN games g ON g.id=a.award_key
+                  WHERE a.award_type='{$type->value}'
+                  AND a.award_tier=$extra
+                  AND g.system_id NOT IN (100, 101)
+                  AND g.title NOT LIKE '%[Subset - %' ";
 
         if ($after !== null) {
-            $query .= "AND a.AwardDate >= '" . $after->format('Y-m-d') . "' ";
+            $query .= "AND a.awarded_at >= '" . $after->format('Y-m-d') . "' ";
         }
 
-        $query .= "GROUP BY AwardData
+        $query .= "GROUP BY award_key
                    ORDER BY num DESC
                    LIMIT $count";
 
@@ -642,7 +642,7 @@ class SummarizeGameStats extends Command
     private function mostMasteredSets(int $count): void
     {
         echo "Most Mastered Sets: MAX(TimesMastered)\r\n```\r\n";
-        $this->mostAwards(1, 1, null, $count);
+        $this->mostAwards(AwardType::Mastery, 1, null, $count);
     }
 
     private function mostPlayedWithoutSets(int $count): void
@@ -654,9 +654,9 @@ class SummarizeGameStats extends Command
                     WHERE rich_presence_updated_at >= '" . Carbon::now()->clone()->subMonths(1)->format('Y-m-d') . "'
                     AND duration >= 5
                     AND game_id IN (
-                        SELECT ID FROM GameData
+                        SELECT id FROM games
                         WHERE achievements_published=0 AND achievements_unpublished<6
-                        AND ConsoleID NOT IN (100,101)
+                        AND system_id NOT IN (100,101)
                     )
                     GROUP BY 1 ORDER BY 2 DESC LIMIT $count";
 

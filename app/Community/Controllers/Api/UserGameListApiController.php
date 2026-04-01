@@ -3,6 +3,7 @@
 namespace App\Community\Controllers\Api;
 
 use App\Actions\GetUserDeviceKindAction;
+use App\Community\Requests\UserGameListEntryRequest;
 use App\Community\Requests\UserGameListRequest;
 use App\Http\Controller;
 use App\Models\User;
@@ -11,7 +12,6 @@ use App\Platform\Actions\BuildGameListAction;
 use App\Platform\Actions\GetRandomGameAction;
 use App\Platform\Enums\GameListType;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class UserGameListApiController extends Controller
 {
@@ -31,14 +31,14 @@ class UserGameListApiController extends Controller
         return response()->json($paginatedData);
     }
 
-    public function store(Request $request, int $gameId): JsonResponse
+    public function store(UserGameListEntryRequest $request, int $gameId): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
 
         $userGameListEntry = UserGameListEntry::firstOrCreate([
             'user_id' => $user->id,
-            'GameID' => $gameId,
+            'game_id' => $gameId,
             'type' => $request->input('userGameListType'),
         ]);
 
@@ -49,18 +49,18 @@ class UserGameListApiController extends Controller
     {
     }
 
-    public function update(Request $request, UserGameListEntry $userGameListEntry): void
+    public function update(UserGameListEntry $userGameListEntry): void
     {
     }
 
-    public function destroy(Request $request, int $gameId): JsonResponse
+    public function destroy(UserGameListEntryRequest $request, int $gameId): JsonResponse
     {
         $user = $request->user();
 
         $type = $request->input('userGameListType');
 
         $userGameListEntry = UserGameListEntry::where('user_id', $user->id)
-            ->where('GameID', $gameId)
+            ->where('game_id', $gameId)
             ->where('type', $type)
             ->first();
 

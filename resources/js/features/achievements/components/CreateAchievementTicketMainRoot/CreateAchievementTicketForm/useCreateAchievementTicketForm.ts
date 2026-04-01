@@ -6,7 +6,6 @@ import { z } from 'zod';
 
 import { toastMessage } from '@/common/components/+vendor/BaseToaster';
 import { usePageProps } from '@/common/hooks/usePageProps';
-import { TicketType } from '@/common/utils/generatedAppConstants';
 import { useCreateTicketMutation } from '@/features/achievements/hooks/mutations/useCreateTicketMutation';
 
 const createAchievementTicketFormSchema = z.object({
@@ -61,6 +60,7 @@ export function useCreateAchievementTicketForm(
             const { ticketId } = submitResponse.data;
 
             // TODO use router.visit after migrating this page to React
+            // eslint-disable-next-line react-compiler/react-compiler -- Full-page navigation is intentional. Eventually when ticket.show is powered by Inertia, this can be changed.
             window.location.href = route('ticket.show', { ticket: ticketId });
           }, 1000);
 
@@ -74,10 +74,12 @@ export function useCreateAchievementTicketForm(
   return { form, mutation, onSubmit };
 }
 
-function getTicketTypeFromIssue(issue: CreateAchievementTicketFormValues['issue']): number {
+function getTicketTypeFromIssue(
+  issue: CreateAchievementTicketFormValues['issue'],
+): App.Community.Enums.TicketType {
   if (issue === 'DidNotTrigger') {
-    return TicketType.DidNotTrigger;
+    return 'did_not_trigger';
   }
 
-  return TicketType.TriggeredAtWrongTime;
+  return 'triggered_at_wrong_time';
 }

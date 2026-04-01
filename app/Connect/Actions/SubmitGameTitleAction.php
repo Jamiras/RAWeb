@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Connect\Actions;
 
-use App\Community\Enums\ArticleType;
+use App\Community\Enums\CommentableType;
 use App\Connect\Support\BaseAuthenticatedApiAction;
 use App\Connect\Support\GeneratesLegacyAuditComment;
 use App\Enums\GameHashCompatibility;
@@ -13,7 +13,9 @@ use App\Models\GameHash;
 use App\Models\GameRelease;
 use App\Models\Role;
 use App\Models\System;
+use App\Platform\Actions\AssociateAchievementSetToGameAction;
 use App\Platform\Actions\UpsertGameCoreAchievementSetFromLegacyFlagsAction;
+use App\Platform\Enums\AchievementSetType;
 use Illuminate\Http\Request;
 
 class SubmitGameTitleAction extends BaseAuthenticatedApiAction
@@ -88,20 +90,20 @@ class SubmitGameTitleAction extends BaseAuthenticatedApiAction
                 return $this->accessDenied('You do not have permission to add games to an inactive system.');
             }
 
-            // title must be unique.
-            // If the title already exists, just try to add the hash to the existing game
+            // `title` must be unique.
+            // If the title already exists, just try to add the hash to the existing game.
             $release = GameRelease::query()
                 ->where('title', $this->gameTitle)
                 ->with('game')
                 ->whereHas('game.system', function ($query) {
-                    $query->where('ID', $this->systemId);
+                    $query->where('id', $this->systemId);
                 })
                 ->first();
             if ($release) {
                 $game = $release->game;
             } else {
                 // no title match, it's a new game
-                $game = new Game(['Title' => $this->gameTitle, 'ConsoleID' => $this->systemId]);
+                $game = new Game(['title' => $this->gameTitle, 'system_id' => $this->systemId]);
                 // these properties are not fillable, so have to be set manually
                 $game->players_total = 0;
                 $game->players_hardcore = 0;
@@ -110,7 +112,7 @@ class SubmitGameTitleAction extends BaseAuthenticatedApiAction
                 $game->achievements_unpublished = 0;
                 $game->save();
 
-                // Create the initial canonical title in game_releases.
+                // create the initial canonical title in game_releases
                 $game->releases()->create([
                     'title' => $this->gameTitle,
                     'is_canonical_game_title' => true,
@@ -118,6 +120,11 @@ class SubmitGameTitleAction extends BaseAuthenticatedApiAction
 
                 // create an empty GameAchievementSet and AchievementSet
                 (new UpsertGameCoreAchievementSetFromLegacyFlagsAction())->execute($game);
+
+                // attempt to auto-attach subset games to their parent game
+                if (str_contains($this->gameTitle, '[Subset -')) {
+                    $this->tryAutoAttachSubsetToParent($game);
+                }
             }
         }
 
@@ -138,7 +145,7 @@ class SubmitGameTitleAction extends BaseAuthenticatedApiAction
                 $message .= " Description: \"$this->hashDescription\"";
             }
 
-            $this->addLegacyAuditComment(ArticleType::GameHash, $game->id, $message);
+            $this->addLegacyAuditComment(CommentableType::GameHash, $game->id, $message);
         }
 
         return [
@@ -146,5 +153,50 @@ class SubmitGameTitleAction extends BaseAuthenticatedApiAction
             'GameID' => $game->id, // simplify access for internal use
             'Response' => ['GameID' => $game->id], // clients expect this value to be nested
         ];
+    }
+
+    /**
+     * When developers create subset games (eg: "Mega Man 2 [Subset - Bonus]"), the subset's
+     * achievement set would normally be orphaned and only accessible via /game/{subsetGameId}.
+     *
+     * This method automatically attaches the subset to its parent game so users can access
+     * it via /game/{parentGameId}?set={achievementSetId} instead. We use Exclusive as
+     * the default type since subset requirements are unknown at creation time, and Exclusive
+     * is the safest assumption (requires unique hash, doesn't load with core achievements).
+     *
+     * If no parent game is found, the subset remains orphaned and can be manually attached
+     * later via the Filament admin panel.
+     */
+    private function tryAutoAttachSubsetToParent(Game $subsetGame): void
+    {
+        /**
+         * Try to extract the parent game title and subset title from `$this->gameTitle`.
+         *
+         * "Mega Man 2 [Subset - Bonus]"
+         *      - parent title: "Mega Man 2"
+         *      - subset title: "Bonus"
+         */
+        if (!preg_match('/^(.+?)\s*\[Subset\s*-\s*(.+?)\]/', $this->gameTitle, $matches)) {
+            return;
+        }
+
+        $parentTitle = trim($matches[1]);
+        $subsetName = trim($matches[2]);
+
+        // Now, try to find the parent game by an exact title match on the same system.
+        $parentGame = Game::where('title', $parentTitle)
+            ->where('system_id', $this->systemId)
+            ->first();
+
+        if (!$parentGame) {
+            return;
+        }
+
+        (new AssociateAchievementSetToGameAction())->execute(
+            targetGame: $parentGame,
+            sourceGame: $subsetGame,
+            type: AchievementSetType::Exclusive,
+            title: $subsetName
+        );
     }
 }

@@ -33,6 +33,11 @@ class LeaderboardPolicy
         return true;
     }
 
+    public function viewEntries(?User $user, Leaderboard $leaderboard): bool
+    {
+        return true;
+    }
+
     public function create(User $user, ?Game $game = null): bool
     {
         if ($game && $user->hasRole(Role::DEVELOPER_JUNIOR)) {
@@ -80,10 +85,10 @@ class LeaderboardPolicy
     public function updateField(User $user, ?Leaderboard $leaderboard, string $fieldName): bool
     {
         $roleFieldPermissions = [
-            Role::DEVELOPER_JUNIOR => ['Title', 'Description', 'Format', 'LowerIsBetter', 'DisplayOrder', 'state'],
-            Role::DEVELOPER => ['Title', 'Description', 'Format', 'LowerIsBetter', 'DisplayOrder', 'state'],
-            Role::WRITER => ['Title', 'Description'],
-            Role::EVENT_MANAGER => ['Title', 'Description', 'DisplayOrder', 'state'],
+            Role::DEVELOPER_JUNIOR => ['title', 'description', 'format', 'rank_asc', 'order_column', 'state'],
+            Role::DEVELOPER => ['title', 'description', 'format', 'rank_asc', 'order_column', 'state'],
+            Role::WRITER => ['title', 'description'],
+            Role::EVENT_MANAGER => ['title', 'description', 'order_column', 'state'],
         ];
 
         // Root can edit everything.
@@ -153,6 +158,29 @@ class LeaderboardPolicy
     {
         return $user->hasAnyRole([
             Role::EVENT_MANAGER,
+        ]);
+    }
+
+    public function merge(User $user, Leaderboard $leaderboard): bool
+    {
+        if ($this->mergeAny($user)) {
+            return true;
+        }
+
+        // Developers can only merge leaderboards they authored.
+        if ($user->hasRole(Role::DEVELOPER)) {
+            return $leaderboard->author_id === $user->id;
+        }
+
+        return false;
+    }
+
+    public function mergeAny(User $user): bool
+    {
+        // QA and DevCompliance can merge any leaderboard.
+        return $user->hasAnyRole([
+            Role::QUALITY_ASSURANCE,
+            Role::DEV_COMPLIANCE,
         ]);
     }
 }

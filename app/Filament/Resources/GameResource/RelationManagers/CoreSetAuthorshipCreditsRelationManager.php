@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\GameResource\RelationManagers;
 
-use App\Community\Actions\AddGameBadgeCreditAction;
+use App\Community\Actions\AddGameCreditAction;
 use App\Models\AchievementSetAuthor;
 use App\Models\Game;
 use App\Models\GameAchievementSet;
+use App\Models\Role;
 use App\Models\User;
 use App\Platform\Enums\AchievementSetAuthorTask;
 use BackedEnum;
@@ -29,9 +30,7 @@ use Illuminate\Support\Facades\Auth;
 class CoreSetAuthorshipCreditsRelationManager extends RelationManager
 {
     protected static string $relationship = 'coreSetAuthorshipCredits';
-
     protected static ?string $title = 'Set Credits';
-
     protected static string|BackedEnum|null $icon = 'fas-users';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
@@ -46,10 +45,12 @@ class CoreSetAuthorshipCreditsRelationManager extends RelationManager
         return $schema
             ->components([
                 Forms\Components\Select::make('task')
-                    ->options(
-                        collect(AchievementSetAuthorTask::cases())
-                            ->mapWithKeys(fn ($enum) => [$enum->value => $enum->label()])
-                    )
+                    ->options(fn (): array => $this->getAllowedTaskOptions())
+                    ->default(function (): ?string {
+                        $options = $this->getAllowedTaskOptions();
+
+                        return count($options) === 1 ? array_key_first($options) : null;
+                    })
                     ->helperText('NOTE: This is NOT for achievement badge credit. That credit must be granted at the achievement level, not the game level.')
                     ->required(),
 
@@ -131,10 +132,11 @@ class CoreSetAuthorshipCreditsRelationManager extends RelationManager
                         $game = $this->ownerRecord;
                         $user = User::withTrashed()->find((int) $data['user_id']);
 
-                        return (new AddGameBadgeCreditAction())->execute(
+                        return (new AddGameCreditAction())->execute(
                             game: $game,
                             user: $user,
                             date: Carbon::parse($data['created_at']),
+                            task: AchievementSetAuthorTask::from($data['task']),
                         );
                     })
                     ->visible(fn () => $canManageContributionCredit),
@@ -156,5 +158,36 @@ class CoreSetAuthorshipCreditsRelationManager extends RelationManager
             ])
             ->emptyStateHeading('No contribution credits')
             ->emptyStateDescription('Add a contribution credit to see them here.');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getAllowedTaskOptions(): array
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        // Developers and admins can assign any type of credit.
+        if ($user->hasAnyRole([Role::DEVELOPER, Role::ADMINISTRATOR])) {
+            return collect(AchievementSetAuthorTask::cases())
+                ->mapWithKeys(fn ($enum) => [$enum->value => $enum->label()])
+                ->all();
+        }
+
+        $allowedTasks = [];
+
+        // Artists can assign artwork and banner credit.
+        if ($user->hasRole(Role::ARTIST)) {
+            $allowedTasks[AchievementSetAuthorTask::Artwork->value] = AchievementSetAuthorTask::Artwork->label();
+            $allowedTasks[AchievementSetAuthorTask::Banner->value] = AchievementSetAuthorTask::Banner->label();
+        }
+
+        // Playtest managers can assign testing credit.
+        if ($user->hasRole(Role::PLAYTEST_MANAGER)) {
+            $allowedTasks[AchievementSetAuthorTask::Testing->value] = AchievementSetAuthorTask::Testing->label();
+        }
+
+        return $allowedTasks;
     }
 }

@@ -54,7 +54,7 @@ return [
          * achievements
          */
         '/achievementInfo.php' => '/achievement/{ID}',
-        '/achievementinspector.php' => '/game/{g}/achievements',
+        '/achievementinspector.php' => '/manage/games/{g}',
         '/achievementList.php' => '/achievements',
         '/awardedList.php' => '/achievements',
 
@@ -152,7 +152,7 @@ return [
         ],
         '/expiringclaims.php' => '/claims/expiring',
         '/claims' => '/manage/achievement-set-claims',
-        '/claims/expiring' => '/manage/achievement-set-claims?tableSortColumn=Finished&tableSortDirection=asc',
+        '/claims/expiring' => '/manage/achievement-set-claims?tableSortColumn=finished_at&tableSortDirection=asc',
 
         /*
          * redirects (external)

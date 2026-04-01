@@ -108,7 +108,7 @@ describe('Component: SubsetConfigurationButton', () => {
 
   it('given there are configurable sets, renders the button', () => {
     // ARRANGE
-    const game = createGame();
+    const game = createGame({ system: createSystem({ id: 1 }) });
     const selectableGameAchievementSets = [
       createGameAchievementSet({ type: 'core' }),
       createGameAchievementSet({ type: 'bonus' }),
@@ -129,7 +129,7 @@ describe('Component: SubsetConfigurationButton', () => {
 
   it('given the button is clicked, opens the dialog', async () => {
     // ARRANGE
-    const game = createGame();
+    const game = createGame({ system: createSystem({ id: 1 }) });
     const selectableGameAchievementSets = [
       createGameAchievementSet({ type: 'core' }),
       createGameAchievementSet({ type: 'bonus' }),
@@ -157,7 +157,7 @@ describe('Component: SubsetConfigurationButton', () => {
     // ARRANGE
     vi.spyOn(axios, 'put').mockResolvedValueOnce({ data: { success: true } });
 
-    const game = createGame();
+    const game = createGame({ system: createSystem({ id: 1 }) });
     const selectableGameAchievementSets = [
       createGameAchievementSet({ type: 'core' }),
       createGameAchievementSet({ type: 'bonus' }),
@@ -193,7 +193,7 @@ describe('Component: SubsetConfigurationButton', () => {
 
   it('filters out will_be_* type sets from configurable sets', async () => {
     // ARRANGE
-    const game = createGame();
+    const game = createGame({ system: createSystem({ id: 1 }) });
     const selectableGameAchievementSets = [
       createGameAchievementSet({ id: 1, type: 'core', title: 'Core Set' }),
       createGameAchievementSet({ id: 2, type: 'bonus', title: 'Bonus Set' }),
@@ -231,6 +231,59 @@ describe('Component: SubsetConfigurationButton', () => {
       createGameAchievementSet({ type: 'core' }),
       createGameAchievementSet({ type: 'will_be_bonus' }),
       createGameAchievementSet({ type: 'will_be_specialty' }),
+    ];
+
+    render(<SubsetConfigurationButton />, {
+      pageProps: {
+        game,
+        auth: { user: createAuthenticatedUser() },
+        selectableGameAchievementSets,
+        userGameAchievementSetPreferences: {},
+      },
+    });
+
+    // ASSERT
+    expect(screen.queryByRole('button', { name: /subset configuration/i })).not.toBeInTheDocument();
+  });
+
+  it('filters out exclusive type sets from configurable sets', async () => {
+    // ARRANGE
+    const game = createGame({ system: createSystem({ id: 1 }) });
+    const selectableGameAchievementSets = [
+      createGameAchievementSet({ id: 1, type: 'core', title: 'Core Set' }),
+      createGameAchievementSet({ id: 2, type: 'bonus', title: 'Bonus Set' }),
+      createGameAchievementSet({ id: 3, type: 'exclusive', title: 'Exclusive Set' }),
+    ];
+
+    render(<SubsetConfigurationButton />, {
+      pageProps: {
+        game,
+        auth: { user: createAuthenticatedUser() },
+        selectableGameAchievementSets,
+        userGameAchievementSetPreferences: {},
+      },
+    });
+
+    // ACT
+    await userEvent.click(screen.getByRole('button', { name: /subset configuration/i }));
+
+    // ASSERT
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeVisible();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Bonus Set')).toBeVisible();
+    });
+    expect(screen.queryByText('Exclusive Set')).not.toBeInTheDocument();
+  });
+
+  it('given all non-core sets are exclusive type, does not render the button', () => {
+    // ARRANGE
+    const game = createGame();
+    const selectableGameAchievementSets = [
+      createGameAchievementSet({ type: 'core' }),
+      createGameAchievementSet({ type: 'exclusive' }),
     ];
 
     render(<SubsetConfigurationButton />, {

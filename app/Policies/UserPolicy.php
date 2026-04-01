@@ -49,6 +49,21 @@ class UserPolicy
         return true;
     }
 
+    public function viewPlayerAchievements(?User $user, User $model): bool
+    {
+        return true;
+    }
+
+    public function viewPlayerAchievementSets(?User $user, User $model): bool
+    {
+        return true;
+    }
+
+    public function viewPlayerGames(?User $user, User $model): bool
+    {
+        return true;
+    }
+
     public function create(User $user): bool
     {
         // nobody creates users just like that.
@@ -224,7 +239,7 @@ class UserPolicy
             return false;
         }
 
-        if ($user->points >= Rank::MIN_POINTS || $user->points_softcore >= Rank::MIN_POINTS) {
+        if ($user->points_hardcore >= Rank::MIN_POINTS || $user->points >= Rank::MIN_POINTS) {
             return true;
         }
 
@@ -303,7 +318,7 @@ class UserPolicy
 
     public function viewDeveloperFeed(User $user, User $model): bool
     {
-        if ($user->ContribCount === 0) {
+        if ($user->yield_unlocks === 0) {
             return false;
         }
 

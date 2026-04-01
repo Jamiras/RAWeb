@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Data;
 
-use App\Community\Data\TrendingGameData;
+use App\Community\Data\GameActivitySnapshotData;
 use App\Data\AchievementSetClaimGroupData;
 use App\Data\CurrentlyOnlineData;
 use App\Data\ForumTopicData;
@@ -24,7 +24,8 @@ class HomePagePropsData extends Data
     /**
      * @param Collection<int, NewsData> $recentNews
      * @param Collection<int, AchievementSetClaimGroupData> $completedClaims
-     * @param Collection<int, TrendingGameData> $trendingGames
+     * @param Collection<int, GameActivitySnapshotData> $trendingGameSnapshots
+     * @param Collection<int, GameActivitySnapshotData> $popularGameSnapshots
      * @param Collection<int, AchievementSetClaimGroupData> $newClaims
      * @param Collection<int, ForumTopicData> $recentForumPosts
      * @param Collection<int, NewsData>|DeferProp $deferredSiteReleaseNotes
@@ -38,7 +39,8 @@ class HomePagePropsData extends Data
         public Collection $completedClaims,
         public CurrentlyOnlineData $currentlyOnline,
         public PaginatedData $activePlayers,
-        public Collection $trendingGames,
+        public Collection $trendingGameSnapshots,
+        public Collection $popularGameSnapshots,
         public Collection $newClaims,
         public Collection $recentForumPosts,
         public ?string $persistedActivePlayersSearch,
@@ -47,6 +49,7 @@ class HomePagePropsData extends Data
         public bool $hasSiteReleaseNotes = false,
         public bool $hasUnreadSiteReleaseNote = false,
         public Collection|DeferProp $deferredSiteReleaseNotes = new Collection(),
+        public ?int $wiiSetCount = null,
     ) {
     }
 }

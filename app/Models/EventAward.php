@@ -6,7 +6,9 @@ namespace App\Models;
 
 use App\Community\Enums\AwardType;
 use App\Support\Database\Eloquent\BaseModel;
+use Database\Factories\EventAwardFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,9 @@ use Illuminate\Support\Facades\DB;
 
 class EventAward extends BaseModel
 {
+    /** @use HasFactory<EventAwardFactory> */
+    use HasFactory;
+
     protected $table = 'event_awards';
 
     protected $fillable = [
@@ -29,9 +34,9 @@ class EventAward extends BaseModel
     public function getBadgeCountAttribute(): int
     {
         return PlayerBadge::query()
-            ->where('AwardType', AwardType::Event)
-            ->where('AwardData', $this->event_id)
-            ->where('AwardDataExtra', $this->tier_index)
+            ->where('award_type', AwardType::Event)
+            ->where('award_key', $this->event_id)
+            ->where('award_tier', $this->tier_index)
             ->whereHas('user', function ($query) {
                 /** @var Builder<User> $query */
                 $query->tracked();
@@ -53,11 +58,11 @@ class EventAward extends BaseModel
      */
     public function awardedUsers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'SiteAwards', 'id', 'user_id')
-            ->wherePivot('AwardType', AwardType::Event)
-            ->wherePivot('AwardData', $this->event_id)
-            ->wherePivot('AwardDataExtra', $this->tier_index)
-            ->withPivot(['AwardDate'])
+        return $this->belongsToMany(User::class, 'user_awards', 'id', 'user_id')
+            ->wherePivot('award_type', AwardType::Event)
+            ->wherePivot('award_key', $this->event_id)
+            ->wherePivot('award_tier', $this->tier_index)
+            ->withPivot(['awarded_at'])
             ->using(PlayerBadge::class);
     }
 
@@ -80,22 +85,22 @@ class EventAward extends BaseModel
      */
     public function playerBadges(): HasMany
     {
-        $relation = $this->hasMany(PlayerBadge::class, 'AwardDataExtra', 'tier_index')
+        $relation = $this->hasMany(PlayerBadge::class, 'award_tier', 'tier_index')
             ->select([
-                'SiteAwards.id',
-                'SiteAwards.AwardDate',
-                'SiteAwards.user_id',
-                'SiteAwards.AwardDataExtra',
-                'SiteAwards.AwardData',
+                'user_awards.id',
+                'user_awards.awarded_at',
+                'user_awards.user_id',
+                'user_awards.award_tier',
+                'user_awards.award_key',
             ])
-            ->where('AwardType', AwardType::Event);
+            ->where('award_type', AwardType::Event);
 
         // Look up the correct `event_id` using a subquery since we can't access
         // `$this->event_id` during relationship build time.
-        $relation->getQuery()->whereIn('AwardData', function ($query) {
+        $relation->getQuery()->whereIn('award_key', function ($query) {
             $query->select('event_id')
                 ->from('event_awards')
-                ->whereColumn('tier_index', DB::raw('SiteAwards.AwardDataExtra'));
+                ->whereColumn('tier_index', DB::raw('user_awards.award_tier'));
         });
 
         return $relation;

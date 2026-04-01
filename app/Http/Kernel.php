@@ -40,13 +40,12 @@ class Kernel extends HttpKernel
             Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,
-            Middleware\SyncAuthenticationCookie::class,
             \Illuminate\Session\Middleware\AuthenticateSession::class,
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             Middleware\UserPreferences::class,
-            Middleware\UpdateLastLogin::class,
+            Middleware\UpdateLastActivityAt::class,
             Middleware\CheckBanned::class,
             // TODO Web Interceptor middleware
             // TODO \Illuminate\Routing\Middleware\ThrottleRequests::class.':web',
@@ -100,6 +99,9 @@ class Kernel extends HttpKernel
          * Allows to force JSON response regardless of accept header. Not clean but also clean.
          */
         'json' => Middleware\JsonResponse::class,
+
+        // Only applied to Inertia route groups where anonymous SSR may be expensive.
+        'cacheResponse' => \Spatie\ResponseCache\Middlewares\CacheResponse::class,
     ];
 
     /**

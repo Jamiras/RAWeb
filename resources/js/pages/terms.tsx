@@ -21,7 +21,7 @@ const Terms: AppPage = () => {
         <h1 className="mb-4">{t('Legal & Terms')}</h1>
 
         <div className="flex flex-col gap-y-4">
-          {/* 
+          {/*
             scroll-margin-top doesn't seem to work here. Use an invisible div instead
             so we provide some offset for the page sticky nav.
           */}
@@ -42,9 +42,7 @@ const Terms: AppPage = () => {
               </div>
 
               <div>
-                <p role="heading" aria-level={3} className="text-lg font-medium">
-                  {t('Code of Conduct')}
-                </p>
+                <h3 className="mb-0 border-b-0 text-lg font-medium">{t('Code of Conduct')}</h3>
                 <p>
                   <Trans
                     i18nKey="By signing up on RetroAchievements.org, you agree to the <1>Users Code of Conduct</1>."
@@ -74,9 +72,9 @@ const Terms: AppPage = () => {
               <div>
                 <h2 className="text-h4">{t('Disclaimers')}</h2>
 
-                <p role="heading" aria-level={3} className="text-lg font-medium">
+                <h3 className="mb-0 border-b-0 text-lg font-medium">
                   {t('Accountability for content')}
-                </p>
+                </h3>
                 <p>
                   {t(
                     'We are not obliged to monitor the information transmitted or stored by third parties, nor to investigate circumstances that point to illegal activity. Our obligations to remove or block the use of information under generally applicable laws remain unaffected by this.',
@@ -85,9 +83,9 @@ const Terms: AppPage = () => {
               </div>
 
               <div>
-                <p role="heading" aria-level={3} className="text-lg font-medium">
+                <h3 className="mb-0 border-b-0 text-lg font-medium">
                   {t('Accountability for links')}
-                </p>
+                </h3>
 
                 <p>
                   {t(
@@ -106,7 +104,21 @@ const Terms: AppPage = () => {
                 <h2 className="text-h4">{t('Copyright')}</h2>
                 <p>
                   {t(
-                    'Our web pages and their contents are subject to copyright law. Unless expressly permitted by law, every form of utilizing, reproducing or processing works subject to copyright protection on our web pages requires the prior consent of the respective owner of the rights. Individual reproductions of a work are allowed only for private use. The company names, product names, service names and logotypes on this web site are for identification purposes only. All trademarks and registered trademarks are the property of their respective owners.',
+                    'Our web pages and their contents are subject to copyright law. Unless expressly permitted by law, every form of utilizing, reproducing or processing works subject to copyright protection on our web pages requires the prior consent of the respective owner of the rights. Individual reproductions of a work are allowed only for private use. The company names, product names, service names, logotypes, boxart, and screenshots on this web site are for identification purposes only. All trademarks and registered trademarks are the property of their respective owners.',
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="mb-0 border-b-0 text-lg font-medium">{t('Achievement Data')}</h3>
+                <p>
+                  {t(
+                    'Achievement titles, descriptions, and related metadata may be referenced or reused by third parties (eg: for tracking sites or community tools).',
+                  )}
+                </p>
+                <p>
+                  {t(
+                    'Achievement trigger logic (the code and conditions that define how achievements are evaluated) is proprietary to the RetroAchievements community and may not be reused, redistributed, or reproduced without explicit permission. The GPL-3 license covering the RetroAchievements web application source code does not extend to achievement data.',
                   )}
                 </p>
               </div>
@@ -156,9 +168,9 @@ const Terms: AppPage = () => {
               </p>
 
               <div>
-                <p role="heading" aria-level={3} className="text-lg font-medium">
+                <h3 className="mb-0 border-b-0 text-lg font-medium">
                   {t('Information about cookies')}
-                </p>
+                </h3>
 
                 <p>
                   {t(

@@ -1,24 +1,32 @@
 import { useAtomValue } from 'jotai';
 import type { FC } from 'react';
 
-import { GameBreadcrumbs } from '@/common/components/GameBreadcrumbs';
 import { MatureContentWarningDialog } from '@/common/components/MatureContentWarningDialog';
-import { PlayableHeader } from '@/common/components/PlayableHeader';
 import { PlayableMainMedia } from '@/common/components/PlayableMainMedia';
 import { usePageProps } from '@/common/hooks/usePageProps';
+import { getIsSystemPixelated } from '@/common/utils/getIsSystemPixelated';
 
 import { currentListViewAtom } from '../../state/games.atoms';
 import { getAllPageAchievements } from '../../utils/getAllPageAchievements';
 import { AchievementSetEmptyState } from '../AchievementSetEmptyState';
 import { GameAchievementSetsContainer } from '../GameAchievementSetsContainer';
 import { GameCommentList } from '../GameCommentList';
-import { GameHeaderSlotContent } from '../GameHeaderSlotContent';
 import { GameRecentPlayers } from '../GameRecentPlayers';
 import { ResetAllProgressDialog } from '../ResetAllProgressDialog';
 
 export const GameShowMainRoot: FC = () => {
-  const { game, hasMatureContent, isViewingPublishedAchievements, targetAchievementSetId } =
-    usePageProps<App.Platform.Data.GameShowPageProps>();
+  const {
+    game,
+    hasMatureContent,
+    isViewingPublishedAchievements,
+    numScreenshots,
+    playerGameProgressionAwards,
+    screenshots,
+    targetAchievementSetId,
+  } = usePageProps<App.Platform.Data.GameShowPageProps>();
+
+  const hasBeatenGame =
+    !!playerGameProgressionAwards?.beatenSoftcore || !!playerGameProgressionAwards?.beatenHardcore;
 
   const currentListView = useAtomValue(currentListViewAtom);
 
@@ -36,27 +44,17 @@ export const GameShowMainRoot: FC = () => {
       {hasMatureContent ? <MatureContentWarningDialog /> : null}
       {allPageAchievements.length ? <ResetAllProgressDialog /> : null}
 
-      <GameBreadcrumbs
-        game={game}
-        gameAchievementSet={game.gameAchievementSets?.[0]}
-        system={game.system}
+      <PlayableMainMedia
+        expectedHeight={game.system?.screenshotResolutions?.[0]?.height}
+        expectedWidth={game.system?.screenshotResolutions?.[0]?.width}
+        hasAnalogTvOutput={game.system?.hasAnalogTvOutput}
+        hasBeatenGame={hasBeatenGame}
+        imageIngameUrl={game.imageIngameUrl!}
+        imageTitleUrl={game.imageTitleUrl!}
+        isPixelated={getIsSystemPixelated(game.system!.id)}
+        numScreenshots={numScreenshots}
+        screenshots={screenshots}
       />
-
-      <PlayableHeader
-        badgeUrl={game.badgeUrl}
-        systemIconUrl={game.system.iconUrl}
-        systemLabel={game.system.name}
-        title={game.title}
-      >
-        <GameHeaderSlotContent />
-      </PlayableHeader>
-
-      <div className="mt-2">
-        <PlayableMainMedia
-          imageIngameUrl={game.imageIngameUrl!}
-          imageTitleUrl={game.imageTitleUrl!}
-        />
-      </div>
 
       <div className="flex flex-col gap-6">
         <div className="flex flex-col">

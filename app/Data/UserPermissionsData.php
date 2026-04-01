@@ -11,6 +11,7 @@ use App\Models\Game;
 use App\Models\GameSet;
 use App\Models\Leaderboard;
 use App\Models\User;
+use App\Policies\AchievementCommentPolicy;
 use App\Policies\GameCommentPolicy;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Lazy;
@@ -21,13 +22,14 @@ class UserPermissionsData extends Data
 {
     public function __construct(
         public Lazy|bool $authorizeForumTopicComments,
+        public Lazy|bool $createAchievementComments,
         public Lazy|bool $createAchievementSetClaims,
         public Lazy|bool $createForumTopicComments,
         public Lazy|bool $createGameComments,
         public Lazy|bool $createGameForumTopic,
         public Lazy|bool $createMessageThreads,
         public Lazy|bool $createModerationReports,
-        public Lazy|bool $createTriggerTicket,
+        public Lazy|bool $createTicket,
         public Lazy|bool $createUserBetaFeedbackSubmission,
         public Lazy|bool $createUsernameChangeRequest,
         public Lazy|bool $deleteForumTopic,
@@ -44,12 +46,18 @@ class UserPermissionsData extends Data
         public Lazy|bool $manipulateApiKeys,
         public Lazy|bool $resetEntireAccount,
         public Lazy|bool $reviewAchievementSetClaims,
+        public Lazy|bool $updateAchievementDescription,
+        public Lazy|bool $updateAchievementIsPromoted,
+        public Lazy|bool $updateAchievementPoints,
+        public Lazy|bool $updateAchievementTitle,
+        public Lazy|bool $updateAchievementType,
         public Lazy|bool $updateAnyAchievementSetClaim,
         public Lazy|bool $updateAvatar,
         public Lazy|bool $updateGame,
         public Lazy|bool $updateGameSet,
         public Lazy|bool $updateForumTopic,
         public Lazy|bool $updateMotto,
+        public Lazy|bool $viewAchievementLogic,
         public Lazy|bool $viewAnyAchievementSetClaim,
         public Lazy|bool $viewDeveloperInterest,
     ) {
@@ -69,6 +77,10 @@ class UserPermissionsData extends Data
                 ? $user->can('authorize', \App\Models\ForumTopicComment::class)
                 : false
             ),
+            createAchievementComments: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? (new AchievementCommentPolicy())->create($user, $triggerable)
+                : false
+            ),
             createAchievementSetClaims: Lazy::create(fn () => $user ? $user->can('create', [AchievementSetClaim::class, $game]) : false),
             createForumTopicComments: Lazy::create(fn () => $user && $forumTopic
                 ? $user->can('create', [\App\Models\ForumTopicComment::class, $forumTopic])
@@ -84,9 +96,9 @@ class UserPermissionsData extends Data
             ),
             createMessageThreads: Lazy::create(fn () => $user ? $user->can('create', \App\Models\MessageThread::class) : false),
             createModerationReports: Lazy::create(fn () => $user ? $user->can('createModerationReports', User::class) : false),
-            createTriggerTicket: Lazy::create(fn () => $user && $triggerable
-                ? $user->can('createFor', [\App\Models\TriggerTicket::class, $triggerable])
-                : $user?->can('create', \App\Models\TriggerTicket::class) ?? false
+            createTicket: Lazy::create(fn () => $user && $triggerable
+                ? $user->can('createFor', [\App\Models\Ticket::class, $triggerable])
+                : $user?->can('create', \App\Models\Ticket::class) ?? false
             ),
             createUserBetaFeedbackSubmission: Lazy::create(fn () => $user ? $user->can('create', \App\Models\UserBetaFeedbackSubmission::class) : false),
             createUsernameChangeRequest: Lazy::create(fn () => $user ? $user->can('create', \App\Models\UserUsername::class) : false),
@@ -107,12 +119,36 @@ class UserPermissionsData extends Data
                 ? $user->can('review', $claim)
                 : false
             ),
+            updateAchievementDescription: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('updateField', [$triggerable, 'description'])
+                : false
+            ),
+            updateAchievementIsPromoted: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('updateField', [$triggerable, 'is_promoted'])
+                : false
+            ),
+            updateAchievementPoints: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('updateField', [$triggerable, 'points'])
+                : false
+            ),
+            updateAchievementTitle: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('updateField', [$triggerable, 'title'])
+                : false
+            ),
+            updateAchievementType: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('updateField', [$triggerable, 'type'])
+                : false
+            ),
             updateAnyAchievementSetClaim: Lazy::create(fn () => $user ? $user->can('updateAny', AchievementSetClaim::class) : false),
             updateAvatar: Lazy::create(fn () => $user ? $user->can('updateAvatar', $user) : false),
             updateForumTopic: Lazy::create(fn () => $user && $forumTopic ? $user->can('update', $forumTopic) : false),
             updateGame: Lazy::create(fn () => $user && $game ? $user->can('update', $game) : false),
             updateGameSet: Lazy::create(fn () => $user && $gameSet ? $user->can('update', $gameSet) : false),
             updateMotto: Lazy::create(fn () => $user ? $user->can('updateMotto', $user) : false),
+            viewAchievementLogic: Lazy::create(fn () => $user && $triggerable instanceof Achievement
+                ? $user->can('viewLogic', $triggerable)
+                : false
+            ),
             viewAnyAchievementSetClaim: Lazy::create(fn () => $user ? $user->can('viewAny', AchievementSetClaim::class) : false),
             viewDeveloperInterest: Lazy::create(fn () => $user && $game
                 ? $user->can('viewDeveloperInterest', $game)

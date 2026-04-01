@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Resources\GameResource\Pages;
 
 use App\Connect\Actions\SubmitRichPresenceAction;
-use App\Filament\Actions\ApplyUploadedImageToDataAction;
+use App\Filament\Actions\ViewOnSiteAction;
 use App\Filament\Concerns\HasFieldLevelAuthorization;
-use App\Filament\Enums\ImageUploadType;
 use App\Filament\Resources\GameResource;
 use App\Models\Game;
 use App\Models\User;
@@ -34,30 +33,38 @@ class Edit extends EditRecord
         return 'Edit';
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            ViewOnSiteAction::make('view-on-site'),
+        ];
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $this->authorizeFields($this->record, $data);
 
-        $action = new ApplyUploadedImageToDataAction();
+        // Normalize empty strings to null to prevent spurious activity log entries.
+        $nullableTextFields = ['developer', 'publisher', 'genre', 'legacy_guide_url'];
+        foreach ($nullableTextFields as $field) {
+            if (array_key_exists($field, $data) && $data[$field] === '') {
+                $data[$field] = null;
+            }
+        }
 
-        $action->execute($data, 'ImageIcon', ImageUploadType::GameBadge);
-        $action->execute($data, 'ImageTitle', ImageUploadType::GameTitle);
-        $action->execute($data, 'ImageIngame', ImageUploadType::GameInGame);
-        $action->execute($data, 'ImageBoxArt', ImageUploadType::GameBoxArt);
-
-        // Handle RichPresencePatch separately to ensure trigger versioning is captured.
-        if (array_key_exists('RichPresencePatch', $data)) {
+        // Handle trigger_definition separately to ensure trigger versioning is captured.
+        if (array_key_exists('trigger_definition', $data)) {
             /** @var User $user */
             $user = Auth::user();
             /** @var Game $game */
             $game = $this->record;
 
-            if ($user && $user->can('updateField', [$game, 'RichPresencePatch'])) {
-                (new SubmitRichPresenceAction())->execute($game->id, $data['RichPresencePatch'] ?? '', $user);
+            if ($user && $user->can('updateField', [$game, 'trigger_definition'])) {
+                (new SubmitRichPresenceAction())->execute($game->id, $data['trigger_definition'] ?? '', $user);
             }
 
             // Remove from data array so it doesn't get saved directly by Filament.
-            unset($data['RichPresencePatch']);
+            unset($data['trigger_definition']);
         }
 
         return $data;

@@ -1,6 +1,5 @@
 import userEvent from '@testing-library/user-event';
 
-import { AwardType } from '@/common/utils/generatedAppConstants';
 import { render, screen } from '@/test';
 import { createGame, createPlayerBadge, createPlayerGame, createSystem } from '@/test/factories';
 
@@ -101,7 +100,7 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlocked: 8,
       achievementsUnlockedHardcore: 8,
       achievementsUnlockedSoftcore: 0,
-      highestAward: createPlayerBadge({ awardType: AwardType.Mastery, awardDataExtra: 1 }),
+      highestAward: createPlayerBadge({ awardType: 'mastery', awardTier: 1 }),
     });
 
     render(<PlayerGameProgressBar game={game} playerGame={playerGame} />);
@@ -118,7 +117,7 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlocked: 8,
       achievementsUnlockedHardcore: 8,
       achievementsUnlockedSoftcore: 0,
-      highestAward: createPlayerBadge({ awardType: AwardType.Mastery, awardDataExtra: 0 }),
+      highestAward: createPlayerBadge({ awardType: 'mastery', awardTier: 0 }),
     });
 
     render(<PlayerGameProgressBar game={game} playerGame={playerGame} />);
@@ -135,7 +134,7 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlocked: 8,
       achievementsUnlockedHardcore: 8,
       achievementsUnlockedSoftcore: 0,
-      highestAward: createPlayerBadge({ awardType: AwardType.GameBeaten, awardDataExtra: 1 }),
+      highestAward: createPlayerBadge({ awardType: 'game_beaten', awardTier: 1 }),
     });
 
     render(<PlayerGameProgressBar game={game} playerGame={playerGame} />);
@@ -153,7 +152,7 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlocked: 8,
       achievementsUnlockedHardcore: 0,
       achievementsUnlockedSoftcore: 8,
-      highestAward: createPlayerBadge({ awardType: AwardType.GameBeaten, awardDataExtra: 0 }),
+      highestAward: createPlayerBadge({ awardType: 'game_beaten', awardTier: 0 }),
     });
 
     render(<PlayerGameProgressBar game={game} playerGame={playerGame} />);
@@ -172,8 +171,8 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlockedSoftcore: 0,
       pointsHardcore: 285,
       highestAward: createPlayerBadge({
-        awardType: AwardType.Mastery,
-        awardDataExtra: 1,
+        awardType: 'mastery',
+        awardTier: 1,
         awardDate: new Date('2023-05-06').toISOString(),
       }),
     });
@@ -201,8 +200,8 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlockedSoftcore: 0,
       pointsHardcore: 285,
       highestAward: createPlayerBadge({
-        awardType: AwardType.Mastery,
-        awardDataExtra: 1,
+        awardType: 'mastery',
+        awardTier: 1,
         awardDate: new Date('2023-05-06').toISOString(),
       }),
     });
@@ -228,8 +227,8 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlockedSoftcore: 0,
       pointsHardcore: game.pointsTotal,
       highestAward: createPlayerBadge({
-        awardType: AwardType.Mastery,
-        awardDataExtra: 1,
+        awardType: 'mastery',
+        awardTier: 1,
         awardDate: new Date('2023-05-06').toISOString(),
       }),
     });
@@ -257,8 +256,8 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlockedSoftcore: 0,
       pointsHardcore: game.pointsTotal,
       highestAward: createPlayerBadge({
-        awardType: AwardType.Mastery,
-        awardDataExtra: 1,
+        awardType: 'mastery',
+        awardTier: 1,
         awardDate: new Date('2023-05-06').toISOString(),
       }),
     });
@@ -282,8 +281,8 @@ describe('Component: PlayerGameProgressBar', () => {
       achievementsUnlockedSoftcore: 0,
       pointsHardcore: game.pointsTotal,
       highestAward: createPlayerBadge({
-        awardType: AwardType.GameBeaten,
-        awardDataExtra: 1,
+        awardType: 'game_beaten',
+        awardTier: 1,
         awardDate: new Date('2023-05-06').toISOString(),
       }),
     });
@@ -314,5 +313,46 @@ describe('Component: PlayerGameProgressBar', () => {
 
     // ASSERT
     expect(screen.getByText(/none/i)).toBeVisible();
+  });
+
+  it('given a custom ariaLabel prop is provided, uses it instead of the default', () => {
+    // ARRANGE
+    const system = createSystem({ id: 1 });
+    const game = createGame({ system, achievementsPublished: 33, title: 'Test Game Title' });
+    const playerGame = createPlayerGame({
+      achievementsUnlocked: 8,
+      achievementsUnlockedHardcore: 8,
+      achievementsUnlockedSoftcore: 0,
+    });
+
+    render(
+      <PlayerGameProgressBar
+        game={game}
+        playerGame={playerGame}
+        ariaLabel={'Custom label' as any}
+      />,
+    );
+
+    // ASSERT
+    const linkEl = screen.getByRole('link');
+    expect(linkEl).toHaveAttribute('aria-label', 'Custom label');
+  });
+
+  it('given no ariaLabel prop is provided, generates a default ariaLabel from the game title', () => {
+    // ARRANGE
+    const system = createSystem({ id: 1 });
+    const game = createGame({ system, achievementsPublished: 33, title: 'Test Game Title' });
+    const playerGame = createPlayerGame({
+      achievementsUnlocked: 8,
+      achievementsUnlockedHardcore: 8,
+      achievementsUnlockedSoftcore: 0,
+    });
+
+    render(<PlayerGameProgressBar game={game} playerGame={playerGame} />);
+
+    // ASSERT
+    const linkEl = screen.getByRole('link');
+
+    expect(linkEl).toHaveAttribute('aria-label', 'Navigate to Test Game Title');
   });
 });

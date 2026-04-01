@@ -82,6 +82,21 @@ export const ClaimActionButton: FC = () => {
     );
   }
 
+  if (claimData.wouldBeCollaboration) {
+    return (
+      <ClaimConfirmationDialog
+        data-testid="claim-button"
+        action="create"
+        trigger={
+          <BaseButton className="gap-1.5">
+            <LuFlagTriangleRight />
+            {t('Collaborate')}
+          </BaseButton>
+        }
+      />
+    );
+  }
+
   return (
     <ClaimConfirmationDialog
       data-testid="claim-button"
@@ -106,6 +121,7 @@ const DisabledButton: FC<DisabledButtonProps> = ({ children, className }) => {
 
   return (
     <span
+      // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- intentionally not a <button> because this represents a permanently disabled state.
       role="button"
       aria-disabled={true}
       className={baseButtonVariants({

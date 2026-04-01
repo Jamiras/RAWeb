@@ -10,6 +10,7 @@ import {
 import { UserAvatarStack } from '@/common/components/UserAvatarStack';
 import { cn } from '@/common/utils/cn';
 
+import { deduplicateUserCredits } from '../deduplicateUserCredits';
 import { TooltipCreditRow } from '../TooltipCreditRow';
 import { TooltipCreditsSection } from '../TooltipCreditsSection';
 
@@ -26,14 +27,12 @@ export const DesignCreditsDisplay: FC<DesignCreditsDisplayProps> = ({
   testingCredits,
   writingCredits,
 }) => {
-  const designCreditUsers = [
+  const designCreditUsers = deduplicateUserCredits([
     ...designCredits,
     ...hashCompatibilityTestingCredits,
     ...testingCredits,
     ...writingCredits,
-  ].filter(
-    (user, index, self) => index === self.findIndex((u) => u.displayName === user.displayName),
-  );
+  ]);
 
   return (
     <div
@@ -98,11 +97,11 @@ const DesignCreditIcon: FC<DesignCreditIconProps> = ({
           {testingCredits.length ? (
             <TooltipCreditsSection headingLabel={t('Playtesters')}>
               {testingCredits.map((credit) => (
-                /**
-                 * TODO show dates
-                 * right now these are attached to achievements... it should probably be set credit
-                 */
-                <TooltipCreditRow key={`testing-credit-${credit.displayName}`} credit={credit} />
+                <TooltipCreditRow
+                  key={`testing-credit-${credit.displayName}`}
+                  credit={credit}
+                  showCreditDate={true}
+                />
               ))}
             </TooltipCreditsSection>
           ) : null}

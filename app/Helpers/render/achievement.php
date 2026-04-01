@@ -24,18 +24,18 @@ function achievementAvatar(
     }
 
     if (is_array($achievement)) {
-        $id = $achievement['AchievementID'] ?? $achievement['ID'];
+        $id = $achievement['AchievementID'] ?? $achievement['ID'] ?? $achievement['id'];
 
         if ($label !== false) {
-            $title = $achievement['AchievementTitle'] ?? $achievement['Title'];
-            $points = $achievement['Points'] ?? null;
+            $title = $achievement['AchievementTitle'] ?? $achievement['Title'] ?? $achievement['title'];
+            $points = $achievement['Points'] ?? $achievement['points'] ?? null;
             $label = $title . ($points ? ' (' . $points . ')' : '');
             sanitize_outputs($label);   // sanitize before rendering HTML
             $label = str_replace("\n", '', Blade::render('<x-achievement.title :rawTitle="$rawTitle" />', ['rawTitle' => $label]));
         }
 
         if ($icon !== false) {
-            $badgeName = is_string($icon) ? $icon : $achievement['BadgeName'] ?? null;
+            $badgeName = is_string($icon) ? $icon : ($achievement['BadgeName'] ?? $achievement['image_name'] ?? null);
             $icon = media_asset("/Badge/$badgeName.png");
         }
 
@@ -69,7 +69,7 @@ function achievementAvatar(
 
 function renderAchievementCard(int|string|array $achievement, ?string $context = null, ?string $iconUrl = null): string
 {
-    $id = is_int($achievement) || is_string($achievement) ? (int) $achievement : ($achievement['AchievementID'] ?? $achievement['ID'] ?? null);
+    $id = is_int($achievement) || is_string($achievement) ? (int) $achievement : ($achievement['AchievementID'] ?? $achievement['ID'] ?? $achievement['id'] ?? null);
 
     if (empty($id)) {
         return __('legacy.error.error');
@@ -85,14 +85,14 @@ function renderAchievementCard(int|string|array $achievement, ?string $context =
     }
 
     $renderedAchievementTitle = Blade::render('<x-achievement.title :rawTitle="$rawTitle" />', [
-        'rawTitle' => $data['AchievementTitle'] ?? $data['Title'] ?? '',
+        'rawTitle' => $data['AchievementTitle'] ?? $data['Title'] ?? $data['title'] ?? '',
     ]);
     $sanitizedAchievementTitle = str_replace("\n", '', $renderedAchievementTitle);
     $sanitizedAchievementTitle = trim(html_entity_decode($sanitizedAchievementTitle, ENT_QUOTES, 'UTF-8'));
 
-    $description = $data['AchievementDesc'] ?? $data['Description'] ?? null;
-    $achPoints = $data['Points'] ?? null;
-    $badgeName = $data['BadgeName'] ?? null;
+    $description = $data['AchievementDesc'] ?? $data['Description'] ?? $data['description'] ?? null;
+    $achPoints = $data['Points'] ?? $data['points'] ?? null;
+    $badgeName = $data['BadgeName'] ?? $data['image_name'] ?? null;
     $type = $data['Type'] ?? $data['type'] ?? null;
     $badgeImgSrc = $iconUrl ?? media_asset("Badge/{$badgeName}.png");
     $renderedGameTitle = Blade::render('<x-game-title :rawTitle="$rawTitle" />', ['rawTitle' => $data['GameTitle'] ?? '']);
@@ -151,25 +151,4 @@ function renderAchievementCard(int|string|array $achievement, ?string $context =
     HTML;
 
     return trim(str_replace("\n", '', $tooltip));
-}
-
-function generateAchievementMetaDescription(
-    string $achievementDescription,
-    ?string $achievementType,
-    string $gameTitle,
-    string $consoleName,
-    int $points = 0,
-    int $winnerCount = 0,
-): string {
-    $typeLabel = $achievementType ? __("achievement-type.{$achievementType}") : null;
-    $pointsLabel = $points === 1 ? "point" : "points";
-    $localizedWinnerCount = localized_number($winnerCount);
-    $winnerCountLabel = $winnerCount === 1 ? "player" : "players";
-
-    $bracketText = "$points $pointsLabel";
-    if ($typeLabel) {
-        $bracketText .= ", $typeLabel";
-    }
-
-    return "$achievementDescription [$bracketText], won by $localizedWinnerCount $winnerCountLabel - $gameTitle for $consoleName";
 }

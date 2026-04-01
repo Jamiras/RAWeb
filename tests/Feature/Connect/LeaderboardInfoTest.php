@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Connect;
 
 use App\Models\Leaderboard;
+use App\Models\LeaderboardEntry;
 use App\Models\User;
 use App\Platform\Enums\LeaderboardState;
 use App\Platform\Enums\ValueFormat;
@@ -17,6 +18,17 @@ class LeaderboardInfoTest extends TestCase
     use BootstrapsConnect;
     use RefreshDatabase;
 
+    private function addLeaderboardEntry(User $user, Leaderboard $leaderboard, int $value): void
+    {
+        LeaderboardEntry::factory()->create([
+            'leaderboard_id' => $leaderboard->id,
+            'user_id' => $user->id,
+            'score' => $value,
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+    }
+
     public function testLeaderboardInfo(): void
     {
         $now = Carbon::now();
@@ -25,9 +37,9 @@ class LeaderboardInfoTest extends TestCase
         $game = $this->seedGame();
         /** @var Leaderboard $leaderboard */
         $leaderboard = Leaderboard::factory()->create([
-            'GameID' => $game->id,
-            'LowerIsBetter' => false,
-            'Format' => ValueFormat::Score,
+            'game_id' => $game->id,
+            'rank_asc' => false,
+            'format' => ValueFormat::Score,
             'state' => LeaderboardState::Active,
         ]);
 
@@ -38,12 +50,12 @@ class LeaderboardInfoTest extends TestCase
                 'LeaderboardData' => [
                     'Entries' => [],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -59,9 +71,9 @@ class LeaderboardInfoTest extends TestCase
         /** @var User $playerThree */
         $playerThree = User::factory()->create();
 
-        SubmitLeaderboardEntry($playerTwo, $leaderboard, 500, null);
-        SubmitLeaderboardEntry($playerOne, $leaderboard, 300, null);
-        SubmitLeaderboardEntry($playerThree, $leaderboard, 100, null);
+        $this->addLeaderboardEntry($playerTwo, $leaderboard, 500);
+        $this->addLeaderboardEntry($playerOne, $leaderboard, 300);
+        $this->addLeaderboardEntry($playerThree, $leaderboard, 100);
 
         $this->get($this->apiUrl('lbinfo', ['i' => $leaderboard->id]))
             ->assertStatus(200)
@@ -98,12 +110,12 @@ class LeaderboardInfoTest extends TestCase
                         ],
                     ],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -121,7 +133,9 @@ class LeaderboardInfoTest extends TestCase
         $game = $this->seedGame();
         /** @var Leaderboard $leaderboard */
         $leaderboard = Leaderboard::factory()->create([
-            'GameID' => $game->id,
+            'game_id' => $game->id,
+            'rank_asc' => true,
+            'format' => ValueFormat::Score,
             'state' => LeaderboardState::Disabled,
         ]);
 
@@ -132,12 +146,12 @@ class LeaderboardInfoTest extends TestCase
                 'LeaderboardData' => [
                     'Entries' => [],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -155,9 +169,9 @@ class LeaderboardInfoTest extends TestCase
         $game = $this->seedGame();
         /** @var Leaderboard $leaderboard */
         $leaderboard = Leaderboard::factory()->create([
-            'GameID' => $game->id,
-            'LowerIsBetter' => 1,
-            'Format' => ValueFormat::Score,
+            'game_id' => $game->id,
+            'rank_asc' => true,
+            'format' => ValueFormat::Score,
             'state' => LeaderboardState::Active,
         ]);
 
@@ -168,12 +182,12 @@ class LeaderboardInfoTest extends TestCase
                 'LeaderboardData' => [
                     'Entries' => [],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -208,17 +222,17 @@ class LeaderboardInfoTest extends TestCase
         // 6 = 500
         // 8 = 500 (later)
 
-        SubmitLeaderboardEntry($playerOne, $leaderboard, 300, null);
-        SubmitLeaderboardEntry($playerTwo, $leaderboard, 200, null);
-        SubmitLeaderboardEntry($playerFive, $leaderboard, 400, null);
-        SubmitLeaderboardEntry($playerSix, $leaderboard, 500, null);
-        SubmitLeaderboardEntry($playerSeven, $leaderboard, 100, null);
+        $this->addLeaderboardEntry($playerOne, $leaderboard, 300);
+        $this->addLeaderboardEntry($playerTwo, $leaderboard, 200);
+        $this->addLeaderboardEntry($playerFive, $leaderboard, 400);
+        $this->addLeaderboardEntry($playerSix, $leaderboard, 500);
+        $this->addLeaderboardEntry($playerSeven, $leaderboard, 100);
 
         $later = $now->clone()->addMinutes(3);
         Carbon::setTestNow($later);
-        SubmitLeaderboardEntry($playerThree, $leaderboard, 300, null);
-        SubmitLeaderboardEntry($playerFour, $leaderboard, 100, null);
-        SubmitLeaderboardEntry($playerEight, $leaderboard, 500, null);
+        $this->addLeaderboardEntry($playerThree, $leaderboard, 300);
+        $this->addLeaderboardEntry($playerFour, $leaderboard, 100);
+        $this->addLeaderboardEntry($playerEight, $leaderboard, 500);
 
         // near user in middle returns items around user
         $this->get($this->apiUrl('lbinfo', ['i' => $leaderboard->id, 'u' => $playerFive->display_name, 'c' => 3]))
@@ -256,12 +270,12 @@ class LeaderboardInfoTest extends TestCase
                         ],
                     ],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -306,12 +320,12 @@ class LeaderboardInfoTest extends TestCase
                         ],
                     ],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,
@@ -319,6 +333,7 @@ class LeaderboardInfoTest extends TestCase
                     'TotalEntries' => 8,
                 ],
             ]);
+
         // near last user returns last N entries
         $this->get($this->apiUrl('lbinfo', ['i' => $leaderboard->id, 'u' => $playerEight->display_name, 'c' => 3]))
             ->assertStatus(200)
@@ -355,12 +370,12 @@ class LeaderboardInfoTest extends TestCase
                         ],
                     ],
                     'GameID' => $game->id,
-                    'LBAuthor' => $leaderboard->developer?->User,
+                    'LBAuthor' => $leaderboard->developer?->username,
                     'LBCreated' => $now->format('Y-m-d H:i:s'),
                     'LBDesc' => $leaderboard->description,
                     'LBFormat' => $leaderboard->format,
                     'LBID' => $leaderboard->id,
-                    'LBMem' => $leaderboard->Mem,
+                    'LBMem' => $leaderboard->trigger_definition,
                     'LBTitle' => $leaderboard->title,
                     'LBUpdated' => $now->format('Y-m-d H:i:s'),
                     'LBState' => $leaderboard->state->value,

@@ -32,6 +32,7 @@ describe('Component: GameMobileHeader', () => {
     const { container } = render(<GameMobileHeader />, {
       pageProps: {
         backingGame: createGame(),
+        can: {},
         game: createGame(),
         isOnWantToPlayList: false,
       },
@@ -49,6 +50,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -69,6 +71,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -86,6 +89,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -110,6 +114,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: true,
       },
     });
@@ -127,6 +132,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -136,11 +142,46 @@ describe('Component: GameMobileHeader', () => {
     expect(button).not.toBePressed();
   });
 
+  it('given the user can manage games, shows the manage chip', () => {
+    // ARRANGE
+    const game = createGame();
+
+    render(<GameMobileHeader />, {
+      pageProps: {
+        game,
+        backingGame: game,
+        can: { manageGames: true },
+        isOnWantToPlayList: false,
+      },
+    });
+
+    // ASSERT
+    expect(screen.getByRole('link', { name: /manage/i })).toBeVisible();
+  });
+
+  it('given the user cannot manage games, does not show the manage chip', () => {
+    // ARRANGE
+    const game = createGame();
+
+    render(<GameMobileHeader />, {
+      pageProps: {
+        game,
+        backingGame: game,
+        can: { manageGames: false },
+        isOnWantToPlayList: false,
+      },
+    });
+
+    // ASSERT
+    expect(screen.queryByRole('link', { name: /manage/i })).not.toBeInTheDocument();
+  });
+
   it('given the game is for the Nintendo DS, applies special background image styling', () => {
     // ARRANGE
     const system = createSystem({ id: 18, nameShort: 'NDS' });
     const game = createGame({
       system,
+      banner: undefined,
       imageIngameUrl: 'https://example.com/game.jpg',
     });
 
@@ -148,16 +189,18 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
 
     // ASSERT
-    const backgroundDiv = container.querySelector('[style*="background-image"]');
-    expect(backgroundDiv).toHaveStyle({
-      backgroundSize: '100% auto',
-      backgroundPosition: 'center 0%',
-    });
+    const fallbackImg = container.querySelector('img[src="https://example.com/game.jpg"]');
+    expect(fallbackImg).toBeInTheDocument();
+
+    expect((fallbackImg as any)?.style.objectPosition).toEqual('center 0%');
+    expect((fallbackImg as any)?.style.objectFit).toEqual('none');
+    expect((fallbackImg as any)?.style.scale).toEqual('2');
   });
 
   it('given the game is not for the Nintendo DS, applies standard background styling', () => {
@@ -165,6 +208,7 @@ describe('Component: GameMobileHeader', () => {
     const system = createSystem({ id: 1, nameShort: 'SNES' });
     const game = createGame({
       system,
+      banner: undefined,
       imageIngameUrl: 'https://example.com/game.jpg',
     });
 
@@ -172,16 +216,17 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
 
     // ASSERT
-    const backgroundDiv = container.querySelector('[style*="background-image"]');
-    expect(backgroundDiv).toHaveStyle({
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    });
+    const fallbackImg = container.querySelector('img[src="https://example.com/game.jpg"]');
+    expect(fallbackImg).toBeInTheDocument();
+
+    expect((fallbackImg as any)?.style.objectPosition).toEqual('center');
+    expect((fallbackImg as any)?.style.objectFit).toEqual('cover');
   });
 
   it('given the game title is longer than 22 characters, uses XL font size', () => {
@@ -194,6 +239,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -213,6 +259,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -232,6 +279,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -251,6 +299,7 @@ describe('Component: GameMobileHeader', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });

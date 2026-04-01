@@ -3,12 +3,15 @@ import { useHydrateAtoms } from 'jotai/utils';
 import { useEffect } from 'react';
 
 import { SEO } from '@/common/components/SEO';
+import { SEOPreloadBanner } from '@/common/components/SEOPreloadBanner';
+import { SEOPreloadImage } from '@/common/components/SEOPreloadImage';
 import { usePageProps } from '@/common/hooks/usePageProps';
 import { AppLayout } from '@/common/layouts/AppLayout';
 import type { AppPage } from '@/common/models';
 import { GameShowMainRoot } from '@/features/games/components/+show';
 import { GameShowMobileRoot } from '@/features/games/components/+show-mobile';
 import { GameShowSidebarRoot } from '@/features/games/components/+show-sidebar';
+import { GameDesktopBanner } from '@/features/games/components/GameDesktopBanner';
 import { useGameMetaDescription } from '@/features/games/hooks/useGameMetaDescription';
 import {
   currentListViewAtom,
@@ -23,6 +26,7 @@ import type { TranslatedString } from '@/types/i18next';
 const GameShow: AppPage = () => {
   const {
     backingGame,
+    banner,
     game,
     initialSort,
     initialView,
@@ -43,7 +47,9 @@ const GameShow: AppPage = () => {
     //
   ]);
 
-  // Reset the sort order when switching between achievement sets.
+  // useHydrateAtoms only sets atoms on initial mount. When the user switches
+  // achievement sets, the sort needs to be re-synced from the server props.
+  // TODO this probably shouldn't live at the page component level
   useEffect(() => {
     setCurrentPlayableListSort(initialSort);
   }, [targetAchievementSetId, initialSort, setCurrentPlayableListSort]);
@@ -61,12 +67,23 @@ const GameShow: AppPage = () => {
         noindex={noindex}
       />
 
+      {/* Mobile uses the in-game screenshot when there's no custom banner, so preload that instead. */}
+      {ziggy.device === 'mobile' && banner?.isFallback && game.imageIngameUrl ? (
+        <SEOPreloadImage src={game.imageIngameUrl} type="image/png" media="(max-width: 767px)" />
+      ) : (
+        <SEOPreloadBanner banner={banner} device={ziggy.device} />
+      )}
+
       {ziggy.device === 'mobile' ? (
         <AppLayout.Main>
           <GameShowMobileRoot />
         </AppLayout.Main>
       ) : (
         <>
+          <AppLayout.Banner className="md:-mb-[30px]">
+            <GameDesktopBanner banner={banner} />
+          </AppLayout.Banner>
+
           <AppLayout.Main>
             <GameShowMainRoot />
           </AppLayout.Main>

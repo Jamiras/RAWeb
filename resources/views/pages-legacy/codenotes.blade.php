@@ -18,7 +18,7 @@ if (empty($gameData)) {
 
 $userModel = null;
 if ($user) {
-    $userModel = User::find($userDetails['ID']);
+    $userModel = User::find($userDetails['id']);
 }
 
 $codeNotes = [];
@@ -35,7 +35,6 @@ if (str_contains($gameData['Title'], "[Subset - ")) {
         ->where('type', '!=', AchievementSetType::Core)
         // exclusive subsets can maintain their own notes
         ->where('type', '!=', AchievementSetType::Exclusive)
-        ->where('type', '!=', AchievementSetType::WillBeExclusive)
         ->first();
 
     if ($subsetGameAchievementSet) {
@@ -385,7 +384,7 @@ function saveCodeNote(rowIndex, isDeleting = false) {
             echo "<br/>";
             $icon = "<img decoding='async' width='24' height='24' src='{$subset->game->badgeUrl}' class='badgeimg'>";
             $link = "codenotes.php?g=" . $subset->game_id;
-            $label = Blade::render("<x-game-title :rawTitle=\"\$rawTitle\" />", ['rawTitle' => $subset->game->Title]);
+            $label = Blade::render("<x-game-title :rawTitle=\"\$rawTitle\" />", ['rawTitle' => $subset->game->title]);
             echo "<span class='inline'><a class='inline-block' href='$link'>$icon $label</a></span>";
         }
     }

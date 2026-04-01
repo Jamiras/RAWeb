@@ -6,9 +6,10 @@ namespace App\Http\Controllers;
 
 use App\Community\Actions\BuildActivePlayersAction;
 use App\Community\Actions\BuildThinRecentForumPostsDataAction;
-use App\Community\Actions\BuildTrendingGamesAction;
+use App\Community\Actions\FetchGameActivityDataAction;
 use App\Community\Enums\AwardType;
 use App\Community\Enums\ClaimStatus;
+use App\Community\Enums\GameActivitySnapshotType;
 use App\Community\Enums\NewsCategory;
 use App\Data\StaticDataData;
 use App\Enums\Permissions;
@@ -22,6 +23,7 @@ use App\Http\Actions\BuildUserCurrentGameDataAction;
 use App\Http\Actions\CheckHasUnreadSiteReleaseNoteAction;
 use App\Http\Controller;
 use App\Http\Data\HomePagePropsData;
+use App\Models\Game;
 use App\Models\News;
 use App\Models\StaticData;
 use App\Models\User;
@@ -39,7 +41,7 @@ class HomeController extends Controller
         BuildNewsDataAction $buildNewsData,
         BuildCurrentlyOnlineDataAction $buildCurrentlyOnlineData,
         BuildActivePlayersAction $buildActivePlayers,
-        BuildTrendingGamesAction $buildTrendingGames,
+        FetchGameActivityDataAction $fetchGameActivityData,
         BuildHomePageClaimsDataAction $buildHomePageClaimsData,
         BuildThinRecentForumPostsDataAction $buildThinRecentForumPostsData,
         BuildUserCurrentGameDataAction $buildUserCurrentGameData,
@@ -62,7 +64,8 @@ class HomeController extends Controller
 
         $persistedActivePlayersSearch = $request->cookie('active_players_search');
         $activePlayers = $buildActivePlayers->execute(perPage: 20, search: $persistedActivePlayersSearch);
-        $trendingGames = $buildTrendingGames->execute();
+        $trendingGameSnapshots = $fetchGameActivityData->execute(GameActivitySnapshotType::Trending);
+        $popularGameSnapshots = $fetchGameActivityData->execute(GameActivitySnapshotType::Popular);
 
         $permissions = $user ? (int) $user->getAttribute('Permissions') : Permissions::Unregistered;
         $recentForumPosts = $buildThinRecentForumPostsData->execute(
@@ -71,6 +74,8 @@ class HomeController extends Controller
 
         $userCurrentGameData = $buildUserCurrentGameData->execute($user);
         $hasUnreadSiteReleaseNote = $checkHasUnreadSiteReleaseNote->execute($user);
+
+        $wiiSetCount = Game::where('system_id', 19)->whereHasPublishedAchievements()->count();
 
         $props = new HomePagePropsData(
             staticData: $staticDataData,
@@ -82,7 +87,8 @@ class HomeController extends Controller
             currentlyOnline: $currentlyOnline,
             newClaims: $newClaims,
             activePlayers: $activePlayers,
-            trendingGames: $trendingGames,
+            trendingGameSnapshots: $trendingGameSnapshots,
+            popularGameSnapshots: $popularGameSnapshots,
             recentForumPosts: $recentForumPosts,
             persistedActivePlayersSearch: $persistedActivePlayersSearch,
             userCurrentGame: $userCurrentGameData[0] ?? null,
@@ -90,6 +96,7 @@ class HomeController extends Controller
             hasSiteReleaseNotes: News::where('category', NewsCategory::SiteReleaseNotes)->exists(),
             hasUnreadSiteReleaseNote: $hasUnreadSiteReleaseNote,
             deferredSiteReleaseNotes: Inertia::defer(fn () => $buildSiteReleaseNotes->execute()),
+            wiiSetCount: $wiiSetCount,
         );
 
         return Inertia::render('index', $props);

@@ -6,17 +6,22 @@ namespace App\Api;
 
 use App\Api\Controllers\CatchAllController;
 use App\Api\Controllers\HealthController;
-use App\Api\Internal\Controllers\AchievementController;
+use App\Api\Internal\Controllers\AchievementController as InternalAchievementController;
 use App\Api\Middleware\AddContentLengthHeader;
 use App\Api\Middleware\LogApiRequest;
 use App\Api\Middleware\LogLegacyApiUsage;
 use App\Api\Middleware\ServiceAccountOnly;
 use App\Api\V1\Controllers\WebApiV1Controller;
+use App\Api\V2\Controllers\AchievementController;
+use App\Api\V2\Controllers\AchievementSetController;
 use App\Api\V2\Controllers\GameController;
+use App\Api\V2\Controllers\HubController;
+use App\Api\V2\Controllers\LeaderboardController;
 use App\Api\V2\Controllers\SystemController;
 use App\Api\V2\Controllers\UserController;
 use App\Http\Concerns\HandlesPublicFileRequests;
 use App\Models\Achievement;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use LaravelJsonApi\Core\Exceptions\JsonApiException;
@@ -32,12 +37,16 @@ class RouteServiceProvider extends ServiceProvider
             $achievement = Achievement::find($value);
 
             if (!$achievement) {
-                throw JsonApiException::error([
-                    'status' => '404',
-                    'code' => 'not_found',
-                    'title' => 'Not Found',
-                    'detail' => "No achievement found with ID {$value}.",
-                ]);
+                if (request()->is('api/*')) {
+                    throw JsonApiException::error([
+                        'status' => '404',
+                        'code' => 'not_found',
+                        'title' => 'Not Found',
+                        'detail' => "No achievement found with ID {$value}.",
+                    ]);
+                }
+
+                throw (new ModelNotFoundException())->setModel(Achievement::class, [$value]);
             }
 
             return $achievement;
@@ -99,9 +108,38 @@ class RouteServiceProvider extends ServiceProvider
                             'throttle:' . $rateLimit
                         )
                         ->resources(function ($server) {
+                            $server->resource('achievements', AchievementController::class)
+                                ->only('index', 'show')
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('playerAchievements')->readOnly();
+                                });
+
+                            $server->resource('achievement-sets', AchievementSetController::class)
+                                ->only('show')
+                                ->readOnly();
+
                             $server->resource('games', GameController::class)
                                 ->only('index', 'show')
-                                ->readOnly();
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('hashes')->readOnly();
+                                });
+
+                            $server->resource('hubs', HubController::class)
+                                ->only('index', 'show')
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('games')->readOnly();
+                                    $relationships->hasMany('links')->readOnly();
+                                });
+
+                            $server->resource('leaderboards', LeaderboardController::class)
+                                ->only('index', 'show')
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('entries')->readOnly();
+                                });
 
                             $server->resource('systems', SystemController::class)
                                 ->only('index', 'show')
@@ -109,7 +147,12 @@ class RouteServiceProvider extends ServiceProvider
 
                             $server->resource('users', UserController::class)
                                 ->only('index', 'show')
-                                ->readOnly();
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('playerAchievements')->readOnly();
+                                    $relationships->hasMany('playerAchievementSets')->readOnly();
+                                    $relationships->hasMany('playerGames')->readOnly();
+                                });
                         });
                 });
 
@@ -128,7 +171,7 @@ class RouteServiceProvider extends ServiceProvider
                         AddContentLengthHeader::class,
                         'throttle:' . $rateLimit,
                     ])->group(function () {
-                        Route::patch('achievements/{achievement}', [AchievementController::class, 'update'])
+                        Route::patch('achievements/{achievement}', [InternalAchievementController::class, 'update'])
                             ->name('internal.achievements.update');
 
                         Route::get('health', [HealthController::class, 'check'])->name('internal.health');

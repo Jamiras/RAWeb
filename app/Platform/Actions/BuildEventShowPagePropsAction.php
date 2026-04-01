@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Platform\Data\EventData;
 use App\Platform\Data\EventShowPagePropsData;
 use App\Platform\Data\GameSetData;
+use App\Platform\Data\PageBannerData;
 use App\Platform\Data\PlayerGameData;
 use App\Platform\Data\PlayerGameProgressionAwardsData;
 
@@ -35,13 +36,20 @@ class BuildEventShowPagePropsAction
         // If this is the case, we need to make an extra query to get the real
         // mastery count of the event.
         if ($numMasters === 0 && !$event->awards->count()) {
-            $numMasters = PlayerBadge::where('AwardType', AwardType::Event)
-                ->where('AwardData', $event->id)
+            $numMasters = PlayerBadge::where('award_type', AwardType::Event)
+                ->where('award_key', $event->id)
                 ->count();
         }
 
         $playerGame = $user
             ? $user->playerGames()->whereGameId($event->legacyGame->id)->first()
+            : null;
+
+        $eventBadge = $user
+            ? $user->playerBadges()
+                ->where('award_type', AwardType::Event)
+                ->where('award_key', $event->id)
+                ->first()
             : null;
 
         $breadcrumbs = $this->buildEventBreadcrumbs($event);
@@ -61,10 +69,10 @@ class BuildEventShowPagePropsAction
                 'eventAchievements.achievement.unlockedHardcoreAt',
                 'eventAchievements.achievement.unlockHardcorePercentage',
                 'eventAchievements.achievement.unlockPercentage',
-                'eventAchievements.achievement.unlocksHardcoreTotal',
+                'eventAchievements.achievement.unlocksHardcore',
                 'eventAchievements.achievement.unlocksTotal',
                 'eventAchievements.achievement',
-                'eventAchievements.sourceAchievement.flags',
+                'eventAchievements.sourceAchievement.isPromoted',
                 'eventAchievements.sourceAchievement.game',
                 'eventAchievements.sourceAchievement.game.system',
                 'eventAchievements.sourceAchievement.game.system.nameShort',
@@ -94,6 +102,9 @@ class BuildEventShowPagePropsAction
             playerGameProgressionAwards: $user
                 ? PlayerGameProgressionAwardsData::fromArray(getUserGameProgressionAwards($event->legacyGame->id, $user))
                 : null,
+            preferredEventAwardTier: $eventBadge?->display_award_tier,
+            earnedEventAwardTier: $eventBadge?->award_tier,
+            banner: PageBannerData::fallback(),
         );
     }
 
@@ -108,7 +119,7 @@ class BuildEventShowPagePropsAction
             return [];
         }
 
-        // Prefer hubs that match the "[Events - *]" pattern.
+        // Event-specific hubs (eg: "[Events - Community]") provide the most relevant breadcrumb trail.
         $eventHub = $hubs->first(fn ($hub) => str_starts_with($hub->title, '[Events - '));
 
         // Fall back to the first hub if no event hub is found.
@@ -116,7 +127,6 @@ class BuildEventShowPagePropsAction
             $eventHub = $hubs->first();
         }
 
-        // Build the breadcrumb trail using the existing hub breadcrumbs action.
         return $this->buildHubBreadcrumbsAction->execute($eventHub);
     }
 }

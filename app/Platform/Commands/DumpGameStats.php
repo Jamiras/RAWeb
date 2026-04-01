@@ -6,6 +6,7 @@ namespace App\Platform\Commands;
 
 use App\Models\Game;
 use App\Models\PlayerAchievementSet;
+use App\Platform\Actions\ComputeAchievementsSetPublishedAtAction;
 use App\Platform\Enums\AchievementSetType;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -14,12 +15,12 @@ use Illuminate\Support\Facades\DB;
 class DumpGameStats extends Command
 {
     // $ time sail artisan ra:platform:player:update-estimated-times
-    //   - takes about a minute
+    //   - takes a couple minutes
     // $ time sail artisan ra:platform:game:dump-stats | tee ~/results.csv
-    //   - takes about 10 minutes
+    //   - takes about half an hour
     // $ cp ~/results.csv ~/source/RAWeb/storage/logs/results.csv
     // $ time sail artisan ra:platform:game:summarize-stats /var/www/html/storage/logs/results.csv | tee ~/mastery.txt
-    //   - takes about a minute
+    //   - takes about 3 minutes
 
     protected $signature = 'ra:platform:game:dump-stats {gameId?}';
 
@@ -33,7 +34,7 @@ class DumpGameStats extends Command
             $games = Game::where('id', $gameId);
         } else {
             $games = Game::where('achievements_published', '>', '0')
-                         ->where('ConsoleID', '<', '100');
+                         ->where('system_id', '<', '100');
         }
 
         echo "Id,Title,ConsoleId,Created,Age,Points,Players,PlayersWithHardcoreUnlocks," .
@@ -53,6 +54,11 @@ class DumpGameStats extends Command
     private function dumpGame(Game $game): void
     {
         $set = $game->achievementSets()->wherePivot('type', '=', AchievementSetType::Core->value)->first();
+        if (!$set->achievements_first_published_at) {
+            $set->achievements_first_published_at = (new ComputeAchievementsSetPublishedAtAction())->execute($set);
+            $set->save();
+        }
+
         $setCreated = $set->achievements_first_published_at;
         $numPlayers = $set->players_total;
         $numHardcorePlayers = $set->players_hardcore;
@@ -121,9 +127,9 @@ class DumpGameStats extends Command
         }
 
         // ID,Title,ConsoleId,Created,Age,Points,Players,PlayersWithHardcoreUnlocks
-        echo "{$game->ID},";
-        echo '"' . str_replace('"', '\\"', $game->Title) . '",';
-        echo "{$game->ConsoleID},";
+        echo "{$game->id},";
+        echo '"' . str_replace('"', '\\"', $game->title) . '",';
+        echo "{$game->system_id},";
         echo $setCreated->toDateTimeString() . ",";
         echo round(Carbon::now()->diffInDays(Carbon::parse($setCreated), true), 4) . ",";
         echo "{$set->points_total},";

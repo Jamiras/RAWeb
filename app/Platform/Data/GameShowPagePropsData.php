@@ -6,6 +6,7 @@ namespace App\Platform\Data;
 
 use App\Community\Data\CommentData;
 use App\Data\UserPermissionsData;
+use App\Platform\Enums\GameBannerPreference;
 use App\Platform\Enums\GamePageListSort;
 use App\Platform\Enums\GamePageListView;
 use Illuminate\Support\Collection;
@@ -29,6 +30,7 @@ class GameShowPagePropsData extends Data
      * @param Collection<int, PlayerAchievementChartBucketData> $playerAchievementChartBuckets
      * @param Collection<int, LeaderboardData> $featuredLeaderboards
      * @param Collection<int, LeaderboardData> $allLeaderboards
+     * @param Collection<int, GameScreenshotData> $screenshots
      */
     public function __construct(
         public AggregateAchievementSetCreditsData $aggregateCredits,
@@ -47,6 +49,7 @@ class GameShowPagePropsData extends Data
         public bool $isMissableOnlyFilterEnabled,
         public bool $isOnWantToDevList,
         public bool $isOnWantToPlayList,
+        public bool $isRichPresenceExpanded,
         public bool $isSubscribedToAchievementComments,
         public bool $isSubscribedToComments,
         public bool $isSubscribedToTickets,
@@ -65,6 +68,10 @@ class GameShowPagePropsData extends Data
         public int $numLeaderboards,
         public int $numMasters,
         public int $numOpenTickets,
+        public int $numScreenshots,
+        /** @var Lazy|Collection<int, GameScreenshotData> */
+        #[AutoInertiaDeferred]
+        public Lazy|Collection $screenshots,
         public Collection $recentPlayers,
         public Collection $recentVisibleComments,
         /** @var GameData[] */
@@ -75,10 +82,12 @@ class GameShowPagePropsData extends Data
         /** @var Collection<int, PlayerAchievementSetData> */
         #[LiteralTypeScriptType('Record<number, App.Platform.Data.PlayerAchievementSet>')]
         public Collection $playerAchievementSets,
+        public GameBannerPreference $bannerPreference,
         /** @var GameAchievementSetData[] */
         public array $selectableGameAchievementSets,
         public ?SeriesHubData $seriesHub,
         public ?GameSetRequestData $setRequestData,
+        public ?PageBannerData $banner,
         public ?int $targetAchievementSetId,
         public ?int $targetAchievementSetPlayersTotal,
         public ?int $targetAchievementSetPlayersHardcore,

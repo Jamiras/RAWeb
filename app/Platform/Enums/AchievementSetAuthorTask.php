@@ -6,12 +6,17 @@ namespace App\Platform\Enums;
 
 enum AchievementSetAuthorTask: string
 {
+    /** TODO rename "artwork" to something like "badge" */
     case Artwork = "artwork";
+    case Banner = "banner";
+    case Testing = "testing";
 
     public function label(): string
     {
         return match ($this) {
             self::Artwork => 'Game Badge Creation',
+            self::Banner => 'Banner Artwork',
+            self::Testing => 'Playtesting',
         };
     }
 }

@@ -1,4 +1,4 @@
-import { type FC, memo } from 'react';
+import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AchievementBreadcrumbs } from '@/common/components/AchievementBreadcrumbs';
@@ -10,29 +10,29 @@ import { usePageProps } from '@/common/hooks/usePageProps';
 
 import { useCommentPagination } from '../hooks/useCommentPagination';
 
-export const AchievementCommentsMainRoot: FC = memo(() => {
+export const AchievementCommentsMainRoot: FC = () => {
   const { achievement, auth, canComment, isSubscribed, paginatedComments } =
-    usePageProps<App.Community.Data.AchievementCommentsPageProps>();
+    usePageProps<App.Community.Data.CommentPageProps>();
 
   const { t } = useTranslation();
 
   const { handleCommentDeleteSuccess, handleCommentSubmitSuccess, handlePageSelectValueChange } =
     useCommentPagination({
       paginatedComments,
-      entityId: achievement.id,
-      entityType: 'Achievement',
+      entityId: achievement!.id,
+      commentableType: 'achievement.comment',
       routeName: 'achievement.comment.index',
     });
 
   return (
     <div>
       <AchievementBreadcrumbs
-        achievement={achievement}
-        game={achievement.game}
-        system={achievement.game?.system}
+        achievement={achievement!}
+        game={achievement!.game}
+        system={achievement!.game?.system}
         t_currentPageLabel={t('Comments')}
       />
-      <AchievementHeading achievement={achievement} wrapperClassName="!mb-1">
+      <AchievementHeading achievement={achievement!} wrapperClassName="!mb-1">
         {t('Comments')}
       </AchievementHeading>
 
@@ -44,7 +44,7 @@ export const AchievementCommentsMainRoot: FC = memo(() => {
 
         {auth ? (
           <SubscribeToggleButton
-            subjectId={achievement.id}
+            subjectId={achievement!.id}
             subjectType="Achievement"
             hasExistingSubscription={isSubscribed}
           />
@@ -54,8 +54,8 @@ export const AchievementCommentsMainRoot: FC = memo(() => {
       <CommentList
         canComment={canComment}
         comments={paginatedComments.items}
-        commentableId={achievement.id}
-        commentableType="Achievement"
+        commentableId={achievement!.id}
+        commentableType="achievement.comment"
         onDeleteSuccess={handleCommentDeleteSuccess}
         onSubmitSuccess={handleCommentSubmitSuccess}
       />
@@ -68,4 +68,4 @@ export const AchievementCommentsMainRoot: FC = memo(() => {
       </div>
     </div>
   );
-});
+};

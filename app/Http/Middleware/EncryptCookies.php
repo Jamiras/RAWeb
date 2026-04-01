@@ -18,6 +18,7 @@ class EncryptCookies extends Middleware
         'theme', // color scheme
         'logo',
         'active_players_search',
+        'banner_state',
         'datatable_view_preference_all_games',
         'datatable_view_preference_generic_games',
         'datatable_view_preference_hub_games',
@@ -31,6 +32,7 @@ class EncryptCookies extends Middleware
         'prefers_hidden_user_profile_stats',
         'prefers_seeing_saved_hidden_rows_when_reordering',
         'progression_status_widths_preference',
+        'prefers_expanded_rich_presence',
         'retroachievements_authenticated',
     ];
 }

@@ -1,6 +1,5 @@
 import { BaseDialog } from '@/common/components/+vendor/BaseDialog';
 import { createAuthenticatedUser } from '@/common/models';
-import { AwardType } from '@/common/utils/generatedAppConstants';
 import { render, screen } from '@/test';
 import {
   createGame,
@@ -369,7 +368,7 @@ describe('Component: GameListItemDialogContent', () => {
     expect(pointsTotalEl).toHaveTextContent('0');
   });
 
-  it('given a game has points, displays the rarity', () => {
+  it('given a game has points, displays the RetroRatio', () => {
     // ARRANGE
     const game = createGame({
       pointsTotal: 100,
@@ -391,14 +390,14 @@ describe('Component: GameListItemDialogContent', () => {
     );
 
     // ASSERT
-    const rarityEl = screen.getByRole('listitem', { name: /rarity/i });
+    const rarityEl = screen.getByRole('listitem', { name: /retroratio/i });
 
     expect(rarityEl).toBeVisible();
-    expect(rarityEl).toHaveTextContent(/rarity/i);
+    expect(rarityEl).toHaveTextContent(/retroratio/i);
     expect(rarityEl).toHaveTextContent('×4.00');
   });
 
-  it('given a game has an unknown number of points, displays a fallback label for rarity', () => {
+  it('given a game has an unknown number of points, displays a fallback label for retroratio', () => {
     // ARRANGE
     const game = createGame({
       pointsTotal: undefined,
@@ -420,10 +419,10 @@ describe('Component: GameListItemDialogContent', () => {
     );
 
     // ASSERT
-    const rarityEl = screen.getByRole('listitem', { name: /rarity/i });
+    const rarityEl = screen.getByRole('listitem', { name: /retroratio/i });
 
     expect(rarityEl).toBeVisible();
-    expect(rarityEl).toHaveTextContent(/rarity/i);
+    expect(rarityEl).toHaveTextContent(/retroratio/i);
     expect(rarityEl).toHaveTextContent(/none/i);
   });
 
@@ -581,8 +580,8 @@ describe('Component: GameListItemDialogContent', () => {
       const playerGame = createPlayerGame({
         achievementsUnlocked: 30,
         highestAward: createPlayerBadge({
-          awardType: AwardType.Mastery,
-          awardDataExtra: 1,
+          awardType: 'mastery',
+          awardTier: 1,
         }),
       });
 

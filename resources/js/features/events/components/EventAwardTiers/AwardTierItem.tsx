@@ -1,29 +1,29 @@
 import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LuCheck } from 'react-icons/lu';
 import { route } from 'ziggy-js';
 
-import {
-  BaseTooltip,
-  BaseTooltipContent,
-  BaseTooltipTrigger,
-} from '@/common/components/+vendor/BaseTooltip';
 import { InertiaLink } from '@/common/components/InertiaLink';
 import { cn } from '@/common/utils/cn';
-import { formatDate } from '@/common/utils/l10n/formatDate';
 
 import { cleanEventAwardLabel } from '../../utils/cleanEventAwardLabel';
+import { EarnedAwardTierCheckmark } from './EarnedAwardTierCheckmark';
 
 interface AwardTierItemProps {
   event: App.Platform.Data.Event;
   eventAward: App.Platform.Data.EventAward;
   hasVirtualTier: boolean;
+  isEarned: boolean;
 }
 
-export const AwardTierItem: FC<AwardTierItemProps> = ({ event, eventAward, hasVirtualTier }) => {
+export const AwardTierItem: FC<AwardTierItemProps> = ({
+  event,
+  eventAward,
+  hasVirtualTier,
+  isEarned,
+}) => {
   const { t } = useTranslation();
 
-  const earnersMessage = useEarnersMessage(!!eventAward.earnedAt, eventAward.badgeCount!);
+  const earnersMessage = useEarnersMessage(isEarned, eventAward.badgeCount!);
 
   // Clean the award label by removing the event title prefix if present.
   const cleanedAwardLabel = cleanEventAwardLabel(eventAward.label, event);
@@ -40,7 +40,7 @@ export const AwardTierItem: FC<AwardTierItemProps> = ({ event, eventAward, hasVi
     <div
       className={cn(
         'group rounded-lg p-1 light:bg-white',
-        eventAward.earnedAt
+        isEarned
           ? 'bg-zinc-700/50 light:border light:border-yellow-500 light:bg-white'
           : 'bg-zinc-800/50 light:bg-zinc-100',
       )}
@@ -53,7 +53,7 @@ export const AwardTierItem: FC<AwardTierItemProps> = ({ event, eventAward, hasVi
               alt={eventAward.label}
               className={cn(
                 'size-12 rounded-sm transition',
-                eventAward.earnedAt
+                isEarned
                   ? 'opacity-100 outline outline-2 outline-offset-1 outline-[gold]'
                   : 'opacity-50 group-hover:opacity-100',
               )}
@@ -67,12 +67,10 @@ export const AwardTierItem: FC<AwardTierItemProps> = ({ event, eventAward, hasVi
                   <>
                     <p
                       data-testid="award-tier-label"
-                      className={cn([
+                      className={cn(
                         'flex gap-2 text-xs font-medium',
-                        awardEarnersLink !== undefined
-                          ? 'transition group-hover:text-link-hover'
-                          : null,
-                      ])}
+                        awardEarnersLink !== undefined && 'transition group-hover:text-link-hover',
+                      )}
                     >
                       {cleanedAwardLabel}
                     </p>
@@ -95,29 +93,11 @@ export const AwardTierItem: FC<AwardTierItemProps> = ({ event, eventAward, hasVi
               <p className="text-2xs text-neutral-500">{earnersMessage}</p>
             </div>
 
-            {eventAward.earnedAt ? (
-              <BaseTooltip>
-                <BaseTooltipTrigger>
-                  <div
-                    data-testid="award-earned-checkmark"
-                    className={cn([
-                      'mr-1 flex size-6 items-center justify-center rounded-full bg-embed',
-                      'light:bg-neutral-200 light:text-neutral-700',
-                      awardEarnersLink !== undefined
-                        ? 'transition group-hover:text-link-hover'
-                        : null,
-                    ])}
-                  >
-                    <LuCheck className="size-4" />
-                  </div>
-                </BaseTooltipTrigger>
-
-                <BaseTooltipContent>
-                  {t('Awarded {{awardedDate}}', {
-                    awardedDate: formatDate(eventAward.earnedAt, 'lll'),
-                  })}
-                </BaseTooltipContent>
-              </BaseTooltip>
+            {isEarned ? (
+              <EarnedAwardTierCheckmark
+                earnedAt={eventAward.earnedAt}
+                hasLink={awardEarnersLink !== undefined}
+              />
             ) : null}
           </div>
         </div>
@@ -151,7 +131,7 @@ function useEarnersMessage(didCurrentUserEarn: boolean, totalEarners: number): s
     });
   }
 
-  if (didCurrentUserEarn && totalEarners === 1) {
+  if (totalEarners === 1) {
     return t('You are the only player to earn this');
   }
 

@@ -16,7 +16,7 @@ interface GameSidebarFullWidthButtonsProps {
 }
 
 export const GameSidebarFullWidthButtons: FC<GameSidebarFullWidthButtonsProps> = ({ game }) => {
-  const { auth, backingGame, can, numCompatibleHashes } =
+  const { auth, backingGame, can, numCompatibleHashes, targetAchievementSetId } =
     usePageProps<App.Platform.Data.GameShowPageProps>();
   const { t } = useTranslation();
 
@@ -49,12 +49,15 @@ export const GameSidebarFullWidthButtons: FC<GameSidebarFullWidthButtonsProps> =
           {numCompatibleHashes > 0 ? (
             <PlayableSidebarButton
               className="border-l-4 border-l-link"
-              href={route('game.hashes.index', { game: backingGame.id })}
+              href={route('game.hashes.index', {
+                game: game.id,
+                set: targetAchievementSetId ?? undefined,
+              })}
               isInertiaLink={true}
               IconComponent={LuFileText}
               count={numCompatibleHashes}
             >
-              {t('Supported Game Files')}
+              {t('Supported Game Hashes')}
             </PlayableSidebarButton>
           ) : null}
 

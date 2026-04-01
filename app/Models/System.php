@@ -56,23 +56,13 @@ class System extends BaseModel implements HasMedia
      */
     use HasSelfHealingUrls;
 
-    // TODO rename Console table to systems
-    // TODO rename ID column to id, remove getIdAttribute()
-    // TODO rename Name column to name, remove getNameAttribute()
-    // TODO rename Created column to created_at
-    // TODO rename Updated column to updated_at
     // TODO: store aggregates?
     // $table->unsignedInteger('points_total')->nullable();
     // $table->unsignedInteger('points_weighted')->nullable();
     // $table->unsignedInteger('achievements_total')->nullable();
     // $table->unsignedInteger('achievements_published')->nullable();
     // $table->unsignedInteger('achievements_unpublished')->nullable();
-    protected $table = 'Console';
-
-    protected $primaryKey = 'ID';
-
-    public const CREATED_AT = 'Created';
-    public const UPDATED_AT = 'Updated';
+    protected $table = 'systems';
 
     protected static function newFactory(): SystemFactory
     {
@@ -85,17 +75,19 @@ class System extends BaseModel implements HasMedia
     }
 
     protected $fillable = [
-        'Name',
+        'name',
         'name_full',
         'name_short',
+        'screenshot_resolutions',
+        'has_analog_tv_output',
         'manufacturer',
         'order_column',
         'active',
     ];
 
     protected $visible = [
-        'ID',
-        'Name',
+        'id',
+        'name',
         'name_full',
         'name_short',
         'manufacturer',
@@ -104,6 +96,8 @@ class System extends BaseModel implements HasMedia
 
     protected $casts = [
         'active' => 'boolean',
+        'screenshot_resolutions' => 'array',
+        'has_analog_tv_output' => 'boolean',
     ];
 
     // == constants
@@ -114,6 +108,8 @@ class System extends BaseModel implements HasMedia
     public const Hubs = 100;
     public const Events = 101;
     public const Standalones = 102;
+
+    // == helpers
 
     public static function getHomebrewSystems(): array
     {
@@ -137,13 +133,13 @@ class System extends BaseModel implements HasMedia
         return in_array($systemId, self::getHomebrewSystems());
     }
 
-    // audit activity log
+    // == logging
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->logOnly([
-                'Name',
+                'name',
                 'name_full',
                 'name_short',
                 'manufacturer',
@@ -187,18 +183,6 @@ class System extends BaseModel implements HasMedia
         return asset('assets/images/system/' . Str::kebab(str_replace('/', '', Str::lower($this->name_short))) . '.png');
     }
 
-    // TODO remove after rename
-    public function getIdAttribute(): int
-    {
-        return $this->attributes['ID'];
-    }
-
-    // TODO remove after rename
-    public function getNameAttribute(): string
-    {
-        return $this->attributes['Name'] ?? '';
-    }
-
     // == mutators
 
     // == relations
@@ -218,7 +202,7 @@ class System extends BaseModel implements HasMedia
      */
     public function games(): HasMany
     {
-        return $this->hasMany(Game::class, 'ConsoleID');
+        return $this->hasMany(Game::class, 'system_id');
     }
 
     /**
@@ -228,7 +212,7 @@ class System extends BaseModel implements HasMedia
      */
     public function achievementGames(): HasMany
     {
-        return $this->hasMany(Game::class)->where('achievements_published', '>', 0);
+        return $this->hasMany(Game::class, 'system_id')->where('achievements_published', '>', 0);
     }
 
     /**
@@ -236,7 +220,7 @@ class System extends BaseModel implements HasMedia
      */
     public function achievements(): HasManyThrough
     {
-        return $this->hasManyThrough(Achievement::class, Game::class);
+        return $this->hasManyThrough(Achievement::class, Game::class, 'system_id');
     }
 
     // == scopes

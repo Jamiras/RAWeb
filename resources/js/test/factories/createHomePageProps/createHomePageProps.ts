@@ -1,12 +1,11 @@
-import { ClaimStatus } from '@/common/utils/generatedAppConstants';
 import { createFactory } from '@/test/createFactory';
 
 import { createAchievementSetClaimGroup } from '../createAchievementSetClaimGroup';
 import { createActivePlayer } from '../createActivePlayer';
+import { createGameActivitySnapshot } from '../createGameActivitySnapshot';
 import { createNews } from '../createNews';
 import { createPaginatedData } from '../createPaginatedData';
 import { createRecentActiveForumTopic } from '../createRecentActiveForumTopic';
-import { createTrendingGame } from '../createTrendingGame';
 import { createAchievementOfTheWeekProps } from './createAchievementOfTheWeekProps';
 import { createStaticData } from './createStaticData';
 import { createStaticGameAward } from './createStaticGameAward';
@@ -20,20 +19,20 @@ export const createHomePageProps = createFactory<App.Http.Data.HomePageProps>((f
     recentNews: [createNews(), createNews(), createNews()],
 
     completedClaims: [
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Complete }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
+      createAchievementSetClaimGroup({ status: 'complete' }),
     ],
 
     newClaims: [
-      createAchievementSetClaimGroup({ status: ClaimStatus.Active }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Active }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Active }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Active }),
-      createAchievementSetClaimGroup({ status: ClaimStatus.Active }),
+      createAchievementSetClaimGroup({ status: 'active' }),
+      createAchievementSetClaimGroup({ status: 'active' }),
+      createAchievementSetClaimGroup({ status: 'active' }),
+      createAchievementSetClaimGroup({ status: 'active' }),
+      createAchievementSetClaimGroup({ status: 'active' }),
     ],
 
     activePlayers: createPaginatedData(
@@ -41,11 +40,18 @@ export const createHomePageProps = createFactory<App.Http.Data.HomePageProps>((f
       { total: 4, unfilteredTotal: 4, currentPage: 1, lastPage: 1, perPage: 20 },
     ),
 
-    trendingGames: [
-      createTrendingGame(),
-      createTrendingGame(),
-      createTrendingGame(),
-      createTrendingGame(),
+    trendingGameSnapshots: [
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
+    ],
+
+    popularGameSnapshots: [
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
+      createGameActivitySnapshot(),
     ],
 
     persistedActivePlayersSearch: null,
@@ -70,5 +76,7 @@ export const createHomePageProps = createFactory<App.Http.Data.HomePageProps>((f
     hasSiteReleaseNotes: false,
     hasUnreadSiteReleaseNote: false,
     deferredSiteReleaseNotes: [],
+
+    wiiSetCount: null,
   };
 });

@@ -10,7 +10,6 @@ use App\Models\GameAchievementSet;
 use App\Models\PlayerAchievement;
 use App\Models\PlayerAchievementSet;
 use App\Models\PlayerGame;
-use App\Platform\Enums\AchievementFlag;
 use App\Platform\Enums\AchievementSetType;
 use App\Platform\Enums\AchievementType;
 use App\Platform\Events\PlayerGameMetricsUpdated;
@@ -31,6 +30,7 @@ class UpdatePlayerGameMetricsAction
             return;
         }
 
+        // get total time spent playing the game (and its subsets)
         $activityService = new PlayerGameActivityService();
         $activityService->initialize($playerGame->user, $playerGame->game, withSubsets: true);
 
@@ -40,8 +40,8 @@ class UpdatePlayerGameMetricsAction
 
         $gameAchievementSetsQuery = GameAchievementSet::where('game_id', $game->id)
             ->with(['achievementSet.achievements' => function ($q) {
-                $q->where('Flags', AchievementFlag::OfficialCore)
-                  ->select(['Achievements.ID', 'type', 'Points', 'TrueRatio']);
+                $q->where('is_promoted', true)
+                    ->select(['achievements.id', 'type', 'points', 'points_weighted']);
             }]);
         $gameAchievementSets = $gameAchievementSetsQuery->get();
 
@@ -71,63 +71,54 @@ class UpdatePlayerGameMetricsAction
         $achievementIds = array_unique($achievementIds);
 
         // get unlocks for all found achievements
-        $achievementsUnlocked = $user->achievements()->whereIn('Achievements.ID', $achievementIds)
+        $achievementsUnlocked = $user->achievements()->whereIn('achievements.id', $achievementIds)
             ->withPivot([
                 'unlocked_at',
                 'unlocked_hardcore_at',
             ])
-            ->select(['Achievements.ID', 'Points', 'TrueRatio'])
+            ->select(['achievements.id', 'achievements.game_id', 'points', 'points_weighted'])
             ->get();
         $achievementsUnlockedHardcore = $achievementsUnlocked->filter(fn (Achievement $achievement) => $achievement->pivot->unlocked_hardcore_at !== null);
 
-        // ==========================
-        // legacy support until everything is migrated - core+subset metrics go into the all_ fields
-        $playerGame->all_achievements_total = count($achievementIds);
-        $playerGame->all_achievements_unlocked = $achievementsUnlocked->count();
-        $playerGame->all_achievements_unlocked_hardcore = $achievementsUnlockedHardcore->count();
-        $playerGame->all_points_total = Achievement::whereIn('ID', $achievementIds)->sum('Points');
-        $playerGame->all_points = $achievementsUnlocked->sum('Points');
-        $playerGame->all_points_hardcore = $achievementsUnlockedHardcore->sum('Points');
-        $playerGame->all_points_weighted = $achievementsUnlockedHardcore->sum('TrueRatio');
-        // ==========================
-
         // process each set
-        $playerAchievementSets = [];
         $possiblePlayerCountChangeGameIds = [];
         foreach ($gameAchievementSets as $gameAchievementSet) {
             $achievementSet = $gameAchievementSet->achievementSet;
-            $playerAchievementSet = PlayerAchievementSet::where('user_id', $playerGame->user->id)
-                ->where('achievement_set_id', $achievementSet->id)
-                ->first();
+            $setAchievementIds = $achievementSet->achievements->pluck('id');
 
-            if (!$playerAchievementSet) {
-                $playerAchievementSet = new PlayerAchievementSet([
-                    'user_id' => $playerGame->user->id,
-                    'achievement_set_id' => $achievementSet->id,
-                    'created_at' => $playerGame->created_at,
-                ]);
-            }
+            $setAchievementsUnlocked = $achievementsUnlocked->filter(fn (Achievement $achievement) => $setAchievementIds->contains($achievement->id));
 
-            $setAchievementIds = [];
-            foreach ($achievementSet->achievements as $achievement) {
-                $setAchievementIds[] = $achievement->id;
-            }
+            // skip subsets the player hasn't touched to avoid creating unnecessary rows
+            $isUntouchedSubset = $setAchievementsUnlocked->count() === 0 && $achievementSet !== $coreAchievementSet;
+            if ($isUntouchedSubset) {
+                $playerAchievementSet = PlayerAchievementSet::where('user_id', $playerGame->user->id)
+                    ->where('achievement_set_id', $achievementSet->id)
+                    ->first();
 
-            $setAchievementsUnlocked = $achievementsUnlocked->filter(fn (Achievement $achievement) => in_array($achievement->id, $setAchievementIds));
-            if ($setAchievementsUnlocked->count() === 0 && $achievementSet !== $coreAchievementSet && !$playerAchievementSet->exists) {
-                // no unlocks for the subset and no existing metrics, don't create a player_achievement_set
-                continue;
+                if (!$playerAchievementSet) {
+                    continue;
+                }
+            } else {
+                $playerAchievementSet = PlayerAchievementSet::firstOrCreate(
+                    [
+                        'user_id' => $playerGame->user->id,
+                        'achievement_set_id' => $achievementSet->id,
+                    ],
+                    [
+                        'created_at' => $playerGame->created_at,
+                    ],
+                );
             }
-            $setAchievementsUnlockedHardcore = $achievementsUnlockedHardcore->filter(fn (Achievement $achievement) => in_array($achievement->id, $setAchievementIds));
+            $setAchievementsUnlockedHardcore = $achievementsUnlockedHardcore->filter(fn (Achievement $achievement) => $setAchievementIds->contains($achievement->id));
 
             $playerAchievementSet->achievements_unlocked = $setAchievementsUnlocked->count();
             $playerAchievementSet->achievements_unlocked_hardcore = $setAchievementsUnlockedHardcore->count();
-            $playerAchievementSet->points = $setAchievementsUnlocked->sum('Points');
-            $playerAchievementSet->points_hardcore = $setAchievementsUnlockedHardcore->sum('Points');
-            $playerAchievementSet->points_weighted = $setAchievementsUnlockedHardcore->sum('TrueRatio');
+            $playerAchievementSet->points = $setAchievementsUnlocked->sum('points');
+            $playerAchievementSet->points_hardcore = $setAchievementsUnlockedHardcore->sum('points');
+            $playerAchievementSet->points_weighted = $setAchievementsUnlockedHardcore->sum('points_weighted');
 
             // if the player went from 0 unlocks to non-zero unlocks, they're considered a player for the set.
-            // similarly, if they went fro non-zero unlocks to zero unlocks, they're no longer considered a
+            // similarly, if they went from non-zero unlocks to zero unlocks, they're no longer considered a
             // player for the set. in both cases, we need to update the game player count
             if (($playerAchievementSet->achievements_unlocked > 0 && $playerAchievementSet->getOriginal('achievements_unlocked') < 1)
                 || ($playerAchievementSet->achievements_unlocked_hardcore > 0 && $playerAchievementSet->getOriginal('achievements_unlocked_hardcore') < 1)
@@ -141,6 +132,20 @@ class UpdatePlayerGameMetricsAction
             $playerAchievementSet->time_taken_hardcore = $summary['achievementPlaytimeHardcore'] ?? 0;
             $playerAchievementSet->last_unlock_at = $summary['lastUnlockTimeSoftcore'];
             $playerAchievementSet->last_unlock_hardcore_at = $summary['lastUnlockTimeHardcore'];
+
+            // if the user has at least one softcore unlock, count a later hardcore unlock also as a softcore unlock
+            if ($playerAchievementSet->last_unlock_at && $playerAchievementSet->last_unlock_hardcore_at > $playerAchievementSet->last_unlock_at) {
+                $lastUnlockAt = $playerAchievementSet->last_unlock_at;
+                if ($playerAchievementSet->completed_at > $playerAchievementSet->last_unlock_at) {
+                    // completed_at was previously set based on a hardcore unlock - use that
+                    $playerAchievementSet->last_unlock_at = $playerAchievementSet->completed_at;
+                } elseif (!$playerAchievementSet->completed_at) {
+                    // game hasn't been completed yet, also count the hardcore unlock as a softcore unlock
+                    $playerAchievementSet->last_unlock_at = $playerAchievementSet->last_unlock_hardcore_at;
+                }
+
+                $playerAchievementSet->time_taken += (int) $playerAchievementSet->last_unlock_at->diffInSeconds($lastUnlockAt, true);
+            }
 
             // update completion progress
             $numSetAchievements = count($setAchievementIds);
@@ -156,21 +161,25 @@ class UpdatePlayerGameMetricsAction
             // ==========================
             // legacy support until everything is migrated - copy core metrics to the player_game base fields
             if ($achievementSet === $coreAchievementSet) {
+                // used by AllAchievementsUnlocked scope on PlayerGame record for suggested games list
                 $playerGame->achievements_total = count($setAchievementIds);
+                // exposed by BuildFollowedPlayerCompletionAction and used by UpdatePlayerMetricsAction
                 $playerGame->achievements_unlocked = $setAchievementsUnlocked->count();
                 $playerGame->achievements_unlocked_hardcore = $setAchievementsUnlockedHardcore->count();
+                $playerGame->points = $setAchievementsUnlocked->sum('points');
+                $playerGame->points_hardcore = $setAchievementsUnlockedHardcore->sum('points');
+                // exposed by BuildFollowedPlayerCompletionAction
                 $playerGame->achievements_unlocked_softcore = $playerGame->achievements_unlocked - $playerGame->achievements_unlocked_hardcore;
-                $playerGame->points_total = $achievementSet->achievements->sum('Points');
-                $playerGame->points = $setAchievementsUnlocked->sum('Points');
-                $playerGame->points_hardcore = $setAchievementsUnlockedHardcore->sum('Points');
-                $playerGame->points_weighted = $setAchievementsUnlockedHardcore->sum('TrueRatio');
+                $playerGame->points_total = $achievementSet->achievements->sum('points');
+                // used by UpdatePlayerMetricsAction
+                $playerGame->points_weighted = $setAchievementsUnlockedHardcore->sum('points_weighted');
                 $playerGame->completion_percentage = $playerAchievementSet->completion_percentage;
                 $playerGame->completion_percentage_hardcore = $playerAchievementSet->completion_percentage_hardcore;
             }
             // ==========================
         }
 
-        $playerAchievements = $achievementsUnlocked->pluck('pivot');
+        $playerAchievements = $achievementsUnlocked->where('game_id', $playerGame->game_id)->pluck('pivot');
         $playerGame->first_unlock_at = $playerAchievements->min('unlocked_at');
         $playerGame->last_unlock_at = $playerAchievements->max('unlocked_at');
         $playerGame->last_unlock_hardcore_at = $playerAchievements->max('unlocked_hardcore_at');
@@ -189,7 +198,7 @@ class UpdatePlayerGameMetricsAction
         }
 
         if ($beatenChanged) {
-            dispatch(new UpdateGameBeatenMetricsJob($game->ID))->onQueue('game-beaten-metrics');
+            dispatch(new UpdateGameBeatenMetricsJob($game->id))->onQueue('game-beaten-metrics');
         }
 
         foreach ($possiblePlayerCountChangeGameIds as $gameId) {
@@ -274,8 +283,8 @@ class UpdatePlayerGameMetricsAction
      */
     public function beatProgressMetrics(PlayerGame $playerGame, AchievementSet $coreAchievementSet, Collection $achievementsUnlocked): array
     {
-        $progressionAchievementIds = $coreAchievementSet->achievements->where('type', AchievementType::Progression)->pluck('ID')->toArray();
-        $winConditionIds = $coreAchievementSet->achievements->where('type', AchievementType::WinCondition)->pluck('ID')->toArray();
+        $progressionAchievementIds = $coreAchievementSet->achievements->where('type', AchievementType::Progression)->pluck('id')->toArray();
+        $winConditionIds = $coreAchievementSet->achievements->where('type', AchievementType::WinCondition)->pluck('id')->toArray();
 
         // If the game has no beaten-tier achievements assigned, it is not considered beatable.
         // Bail.
@@ -286,9 +295,9 @@ class UpdatePlayerGameMetricsAction
             ];
         }
 
-        $progressionUnlocks = $achievementsUnlocked->whereIn('ID', $progressionAchievementIds)->pluck('pivot');
+        $progressionUnlocks = $achievementsUnlocked->whereIn('id', $progressionAchievementIds)->pluck('pivot');
         $progressionUnlocksHardcore = $progressionUnlocks->filter(fn (PlayerAchievement $playerAchievement) => $playerAchievement->unlocked_hardcore_at !== null);
-        $winConditionUnlocks = $achievementsUnlocked->whereIn('ID', $winConditionIds)->pluck('pivot');
+        $winConditionUnlocks = $achievementsUnlocked->whereIn('id', $winConditionIds)->pluck('pivot');
         $winConditionUnlocksHardcore = $winConditionUnlocks->filter(fn (PlayerAchievement $playerAchievement) => $playerAchievement->unlocked_hardcore_at !== null);
         $progressionUnlocksSoftcoreCount = $progressionUnlocks->count();
         $progressionUnlocksHardcoreCount = $progressionUnlocksHardcore->count();
