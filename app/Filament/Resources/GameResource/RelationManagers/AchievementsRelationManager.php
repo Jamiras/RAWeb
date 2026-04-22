@@ -63,7 +63,12 @@ class AchievementsRelationManager extends RelationManager
         $user = Auth::user();
 
         if ($ownerRecord instanceof Game) {
-            return $user->can('manage', $ownerRecord);
+            // Playtest managers can access games but don't interact with achievements.
+            if ($user->hasRole(Role::PLAYTEST_MANAGER) && !$user->hasAnyRole([Role::DEVELOPER, Role::DEVELOPER_JUNIOR, Role::ARTIST])) {
+                return false;
+            }
+
+            return $user->can('viewDetails', $ownerRecord);
         }
 
         return false;
@@ -916,7 +921,7 @@ class AchievementsRelationManager extends RelationManager
 
         $this->isEditingDisplayOrders = true;
 
-        $this->resetTable();
+        $this->flushCachedTableRecords();
     }
 
     public function saveDisplayOrders(): void
@@ -958,7 +963,7 @@ class AchievementsRelationManager extends RelationManager
 
         $this->isEditingDisplayOrders = false;
         $this->pendingDisplayOrders = [];
-        $this->resetTable();
+        $this->flushCachedTableRecords();
 
         Notification::make()
             ->title('Display orders updated')
@@ -971,7 +976,7 @@ class AchievementsRelationManager extends RelationManager
         $this->isEditingDisplayOrders = false;
         $this->pendingDisplayOrders = [];
 
-        $this->resetTable();
+        $this->flushCachedTableRecords();
     }
 
     private function canReorderAchievements(): bool

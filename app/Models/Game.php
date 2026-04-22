@@ -16,8 +16,10 @@ use App\Platform\Contracts\HasPermalink;
 use App\Platform\Contracts\HasVersionedTrigger;
 use App\Platform\Data\PageBannerData;
 use App\Platform\Enums\AchievementSetType;
+use App\Platform\Enums\GameScreenshotStatus;
 use App\Platform\Enums\GameSetType;
 use App\Platform\Enums\ReleasedAtGranularity;
+use App\Platform\Enums\ScreenshotType;
 use App\Support\Database\Eloquent\BaseModel;
 use Database\Factories\GameFactory;
 use Fico7489\Laravel\Pivot\Traits\PivotEventTrait;
@@ -73,8 +75,10 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
     use Searchable;
     use SoftDeletes;
 
+    public const PLACEHOLDER_BADGE_PATH = '/Images/000001.png';
+    public const PLACEHOLDER_IMAGE_PATH = '/Images/000002.png';
+
     // TODO migrate forum_topic_id to forumable morph
-    // TODO migrate image_*_asset_path columns to media library
     // TODO drop achievement_set_version_hash, migrate to achievement_sets
     protected $table = 'games';
 
@@ -91,6 +95,7 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
         'trigger_id',
         'legacy_guide_url',
         'comments_locked_at',
+        'is_media_restricted',
         'image_icon_asset_path',
         'image_title_asset_path',
         'image_ingame_asset_path',
@@ -99,6 +104,7 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
 
     protected $casts = [
         'comments_locked_at' => 'datetime',
+        'is_media_restricted' => 'boolean',
         'last_achievement_update' => 'datetime',
         'released_at_granularity' => ReleasedAtGranularity::class,
         'released_at' => 'datetime',
@@ -360,6 +366,34 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
                     ->fit(Fit::Crop, 32, 9)
                     ->performOnCollections('banner');
             });
+
+        // Pending player screenshot uploads go here. No conversions
+        // are generated until a reviewer actually approves the screenshot.
+        $this->addMediaCollection('screenshots-pending')
+            ->useDisk('s3');
+
+        $this->addMediaCollection('screenshots')
+            ->useDisk('s3')
+            ->registerMediaConversions(function () {
+                $sizes = ['sm', 'md', 'lg'];
+
+                foreach ($sizes as $size) {
+                    $maxWidth = config("media.game.screenshot.{$size}.width");
+
+                    $this->addMediaConversion("{$size}-webp")
+                        ->format('webp')
+                        ->fit(Fit::Max, $maxWidth, $maxWidth)
+                        ->optimize()
+                        ->performOnCollections('screenshots');
+                }
+
+                $this->addMediaConversion('placeholder')
+                    ->format('webp')
+                    ->width(32)
+                    ->quality(10)
+                    ->fit(Fit::Max, 32, 32)
+                    ->performOnCollections('screenshots');
+            });
     }
 
     // == search
@@ -460,6 +494,40 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
 
     // == actions
 
+    /**
+     * Syncs the legacy image_ingame_asset_path and image_title_asset_path columns
+     * from the primary GameScreenshot records. This keeps all existing API consumers
+     * working without changes.
+     */
+    public function syncLegacyScreenshotFields(?ScreenshotType $resetType = null): void
+    {
+        $primaries = $this->gameScreenshots()
+            ->primary()
+            ->with('media')
+            ->get()
+            ->keyBy(fn (GameScreenshot $s) => $s->type->value);
+
+        $updates = [];
+
+        $primaryIngame = $primaries->get('ingame');
+        if ($primaryIngame) {
+            $updates['image_ingame_asset_path'] = $primaryIngame->media?->getCustomProperty('legacy_path') ?? self::PLACEHOLDER_IMAGE_PATH;
+        } elseif ($resetType === ScreenshotType::Ingame) {
+            $updates['image_ingame_asset_path'] = self::PLACEHOLDER_IMAGE_PATH;
+        }
+
+        $primaryTitle = $primaries->get('title');
+        if ($primaryTitle) {
+            $updates['image_title_asset_path'] = $primaryTitle->media?->getCustomProperty('legacy_path') ?? self::PLACEHOLDER_IMAGE_PATH;
+        } elseif ($resetType === ScreenshotType::Title) {
+            $updates['image_title_asset_path'] = self::PLACEHOLDER_IMAGE_PATH;
+        }
+
+        if (!empty($updates)) {
+            $this->updateQuietly($updates);
+        }
+    }
+
     // == accessors
 
     public function getBadgeUrlAttribute(): string
@@ -474,6 +542,26 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
             ->first();
     }
 
+    public function getImageBoxArtAssetPathAttribute(?string $value): string
+    {
+        return $this->resolveImageAssetPath($value);
+    }
+
+    public function getImageTitleAssetPathAttribute(?string $value): string
+    {
+        return $this->resolveImageAssetPath($value);
+    }
+
+    public function getImageIngameAssetPathAttribute(?string $value): string
+    {
+        return $this->resolveImageAssetPath($value);
+    }
+
+    private function resolveImageAssetPath(?string $value): string
+    {
+        return $this->is_media_restricted ? self::PLACEHOLDER_IMAGE_PATH : ($value ?? self::PLACEHOLDER_IMAGE_PATH);
+    }
+
     public function getImageBoxArtUrlAttribute(): string
     {
         return media_asset($this->image_box_art_asset_path);
@@ -481,19 +569,62 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
 
     public function getImageTitleUrlAttribute(): string
     {
-        return media_asset($this->image_title_asset_path);
+        return $this->resolveScreenshotUrl(ScreenshotType::Title, $this->image_title_asset_path);
     }
 
     public function getImageIngameUrlAttribute(): string
     {
-        return media_asset($this->image_ingame_asset_path);
+        return $this->resolveScreenshotUrl(ScreenshotType::Ingame, $this->image_ingame_asset_path);
+    }
+
+    /**
+     * Prefer the Media Library URL when the relation is loaded,
+     * falling back to the legacy asset path. Restricted games
+     * always use the legacy path (which returns a placeholder).
+     */
+    private function resolveScreenshotUrl(ScreenshotType $type, string $fallbackAssetPath): string
+    {
+        if (!$this->is_media_restricted && $this->relationLoaded('gameScreenshots')) {
+            $url = $this->getPrimaryScreenshot($type)?->media?->getUrl();
+            if ($url) {
+                return $url;
+            }
+        }
+
+        return media_asset($fallbackAssetPath);
+    }
+
+    /**
+     * Callers should ensure the relationship is loaded: Game::with('gameScreenshots.media').
+     */
+    public function getPrimaryScreenshot(ScreenshotType $type = ScreenshotType::Ingame): ?GameScreenshot
+    {
+        return $this->gameScreenshots
+            ->first(fn (GameScreenshot $s) => $s->type === $type && $s->is_primary);
+    }
+
+    /**
+     * Callers should ensure the relationship is loaded: Game::with('gameScreenshots.media').
+     *
+     * @return Collection<int, GameScreenshot>
+     */
+    public function getApprovedScreenshots(ScreenshotType $type = ScreenshotType::Ingame): Collection
+    {
+        return $this->gameScreenshots
+            ->filter(fn (GameScreenshot $s) => $s->type === $type && $s->status === GameScreenshotStatus::Approved)
+            ->sortBy('order_column')
+            ->values();
     }
 
     public function getBannerAttribute(): PageBannerData
     {
         $currentBanner = $this->current_banner_media;
 
-        $url = fn (string $conversion): ?string => $currentBanner?->getUrl($conversion) ?: null;
+        if (!$currentBanner) {
+            return PageBannerData::fallback();
+        }
+
+        $url = fn (string $conversion): ?string => $currentBanner->getUrl($conversion) ?: null;
 
         return new PageBannerData(
             mobileSmWebp: $url('mobile-sm-webp'),
@@ -508,8 +639,8 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
             desktopXlAvif: $url('desktop-xl-avif'),
             mobilePlaceholder: $url('mobile-placeholder'),
             desktopPlaceholder: $url('desktop-placeholder'),
-            leftEdgeColor: $currentBanner?->getCustomProperty('left_edge_color'),
-            rightEdgeColor: $currentBanner?->getCustomProperty('right_edge_color'),
+            leftEdgeColor: $currentBanner->getCustomProperty('left_edge_color'),
+            rightEdgeColor: $currentBanner->getCustomProperty('right_edge_color'),
         );
     }
 
@@ -850,6 +981,14 @@ class Game extends BaseModel implements HasMedia, HasPermalink, HasVersionedTrig
     public function gameAchievementSets(): HasMany
     {
         return $this->hasMany(GameAchievementSet::class, 'game_id', 'id');
+    }
+
+    /**
+     * @return HasMany<GameScreenshot, $this>
+     */
+    public function gameScreenshots(): HasMany
+    {
+        return $this->hasMany(GameScreenshot::class);
     }
 
     /**

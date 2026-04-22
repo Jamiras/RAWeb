@@ -20,4 +20,20 @@ enum ClientSupportLevel: int
 
     // client is recognized, but not officially supported.
     case Unsupported = 4;
+
+    // client is recognized and has known issues. a warning is shown,
+    // but hardcore unlocks and leaderboard submissions are still allowed.
+    case Warned = 5;
+
+    // client is recognized, but doesn't meet our hardcore requirements.
+    case SoftcoreOnly = 6;
+
+    /**
+     * Full and Warned levels both permit hardcore unlocks and leaderboard submissions.
+     * All other levels restrict these capabilities in some way.
+     */
+    public function allowsHardcoreUnlocks(): bool
+    {
+        return $this === self::Full || $this === self::Warned;
+    }
 }

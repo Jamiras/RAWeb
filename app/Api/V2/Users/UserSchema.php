@@ -12,6 +12,7 @@ use LaravelJsonApi\Eloquent\Fields\Boolean;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
 use LaravelJsonApi\Eloquent\Fields\ID;
 use LaravelJsonApi\Eloquent\Fields\Number;
+use LaravelJsonApi\Eloquent\Fields\Relations\HasMany;
 use LaravelJsonApi\Eloquent\Fields\Str;
 use LaravelJsonApi\Eloquent\Filters\Scope;
 use LaravelJsonApi\Eloquent\Pagination\PagePagination;
@@ -64,7 +65,7 @@ class UserSchema extends Schema
         return [
             // Use a permissive pattern to accept ULID, display_name, or username.
             // The actual lookup is handled by UserRepository using FindUserByIdentifierAction.
-            ID::make('ulid')->matchAs('.+'),
+            ID::make('ulid')->matchAs('[^/]+'),
 
             Str::make('displayName', 'display_name')->readOnly(),
 
@@ -91,11 +92,12 @@ class UserSchema extends Schema
             Str::make('visibleRole')->readOnly(),
             ArrayList::make('displayableRoles')->readOnly(),
 
+            HasMany::make('playerAchievements')->type('player-achievements')->cannotEagerLoad()->readOnly(),
+            HasMany::make('playerAchievementSets')->type('player-achievement-sets')->cannotEagerLoad()->readOnly(),
+            HasMany::make('playerGames')->type('player-games')->cannotEagerLoad()->readOnly(),
+
             // TODO add relationships and relationship endpoints
             // - lastGame (BelongsTo Game)
-            // - playerGames (HasMany PlayerGame)
-            // - playerAchievementSets (HasMany PlayerAchievementSet)
-            // - playerAchievements (HasMany PlayerAchievement)
             // - awards (HasMany PlayerBadge)
             // - following (BelongsToMany User) - users this user follows
             // - followers (BelongsToMany User) - users following this user

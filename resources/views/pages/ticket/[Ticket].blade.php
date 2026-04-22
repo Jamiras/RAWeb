@@ -107,7 +107,7 @@ $commentData = [];
                     <x-ticket.stat-element label="Hash">Unknown</x-ticket.stat-element>
                 @endif
                 <x-ticket.stat-element label="Mode">{{ $ticket->hardcore ? "Hardcore" : "Softcore" }}</x-ticket.stat-element>
-                @if (!$ticket->state->isOpen())
+                @if (in_array($ticket->state, [TicketState::Resolved, TicketState::Closed]))
                     @if ($ticket->resolver)
                         <x-ticket.stat-element label="Resolved by">{!! userAvatar($ticket->resolver ?? 'Deleted User', iconSize: 16) !!}</x-ticket.stat-element>
                     @else
@@ -163,7 +163,7 @@ $commentData = [];
     </div>
 
     @if ($ticket->reporter)
-      @can('manage', Ticket::class)
+      @canany(['manage', 'viewHistory'], Ticket::class)
         <div class="mt-2">
             <div class="flex w-full justify-between border-embed-highlight items-center">
                 <p role="heading" aria-level="2" class="mb-0.5 text-2xs font-bold">
@@ -216,7 +216,7 @@ $commentData = [];
                     @else
                         <div class="flex w-full justify-between border-embed-highlight items-center">
                             {{ $ticket->reporter->display_name }} did not earn this achievement
-                            @if ($permissions >= Permissions::Moderator)
+                            @can('manuallyAward', App\Models\PlayerAchievement::class)
                                 <script>
                                     function AwardManually(hardcore) {
                                         showStatusMessage('Awarding...');
@@ -237,13 +237,13 @@ $commentData = [];
                                     <button class="btn" onclick="AwardManually(1)">Award Hardcore</button>
                                     @endif
                                 </div>
-                            @endif
+                            @endcan
                         </div>
                     @endif
                 </div>
             </div>
         </div>
-      @endcan
+      @endcanany
     @endif
 
     <div class="mt-2">
@@ -356,7 +356,7 @@ $commentData = [];
                     </script>
                 @else
                     <input type="hidden" name="action" value="{{ TicketAction::Reopen }}">
-                    <button class='btn'>Reopen this ticket</button>
+                    <button class='btn'>{{ $ticket->state === TicketState::Quarantined ? 'Approve this ticket' : 'Reopen this ticket' }}</button>
                 @endif
             @elseif ($user->id === $ticket->reporter->id)
                 @if ($ticket->state->isOpen())
@@ -366,7 +366,7 @@ $commentData = [];
             @endif
         </form>
 
-        @can('manage', Ticket::class)
+        @canany(['manage', 'viewLogic',], Ticket::class)
             <div class="mt-4 w-full relative flex gap-x-3">
                 <button id="achievementLogicButton" class="btn"
                         onclick="toggleExpander('achievementLogicButton', 'achievementLogicContent')">Achievement Logic ▼</button>
@@ -391,6 +391,6 @@ $commentData = [];
                     <x-trigger.viewer :groups="$groups" />
                 </div>
             </div>
-        @endcan
+        @endcanany
     </div>
 </x-app-layout>

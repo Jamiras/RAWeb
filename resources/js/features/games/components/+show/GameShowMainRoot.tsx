@@ -14,8 +14,18 @@ import { GameRecentPlayers } from '../GameRecentPlayers';
 import { ResetAllProgressDialog } from '../ResetAllProgressDialog';
 
 export const GameShowMainRoot: FC = () => {
-  const { game, hasMatureContent, isViewingPublishedAchievements, targetAchievementSetId } =
-    usePageProps<App.Platform.Data.GameShowPageProps>();
+  const {
+    game,
+    hasMatureContent,
+    isViewingPublishedAchievements,
+    numScreenshots,
+    playerGameProgressionAwards,
+    screenshots,
+    targetAchievementSetId,
+  } = usePageProps<App.Platform.Data.GameShowPageProps>();
+
+  const hasBeatenGame =
+    !!playerGameProgressionAwards?.beatenSoftcore || !!playerGameProgressionAwards?.beatenHardcore;
 
   const currentListView = useAtomValue(currentListViewAtom);
 
@@ -34,8 +44,15 @@ export const GameShowMainRoot: FC = () => {
       {allPageAchievements.length ? <ResetAllProgressDialog /> : null}
 
       <PlayableMainMedia
+        expectedHeight={game.system?.screenshotResolutions?.[0]?.height}
+        expectedWidth={game.system?.screenshotResolutions?.[0]?.width}
+        hasAnalogTvOutput={game.system?.hasAnalogTvOutput}
+        hasBeatenGame={hasBeatenGame}
         imageIngameUrl={game.imageIngameUrl!}
         imageTitleUrl={game.imageTitleUrl!}
+        isPixelated={!game.system!.supportsUpscaledScreenshots}
+        numScreenshots={numScreenshots}
+        screenshots={screenshots}
       />
 
       <div className="flex flex-col gap-6">

@@ -13,6 +13,7 @@ use App\Models\System;
 use App\Models\UnrankedUser;
 use App\Models\User;
 use App\Platform\Actions\UpdateGameBeatenMetricsAction;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
     {
         // Arrange
         $system = System::factory()->create();
-        $game = Game::factory()->create(['system_id' => $system->id]);
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => 6]);
 
         $rankedUser1 = User::factory()->create();
         $rankedUser2 = User::factory()->create();
@@ -37,21 +38,25 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
             'user_id' => $rankedUser1->id,
             'game_id' => $game->id,
             'time_to_beat_hardcore' => 100,
+            'beaten_hardcore_at' => Carbon::now(),
         ]);
         PlayerGame::factory()->create([
             'user_id' => $rankedUser2->id,
             'game_id' => $game->id,
             'time_to_beat_hardcore' => 200,
+            'beaten_hardcore_at' => Carbon::now(),
         ]);
         PlayerGame::factory()->create([
             'user_id' => $rankedUser3->id,
             'game_id' => $game->id,
             'time_to_beat_hardcore' => 300,
+            'beaten_hardcore_at' => Carbon::now(),
         ]);
         PlayerGame::factory()->create([
-            'user_id' => $unrankedUser->id,
+            'user_id' => $unrankedUser->id, // this should be excluded
             'game_id' => $game->id,
-            'time_to_beat_hardcore' => 30, // this should be excluded
+            'time_to_beat_hardcore' => 30,
+            'beaten_hardcore_at' => Carbon::now(),
         ]);
 
         // Act
@@ -67,7 +72,7 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
     {
         // Arrange
         $system = System::factory()->create();
-        $game = Game::factory()->create(['system_id' => $system->id]);
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => 10]);
 
         $achievementSet = AchievementSet::factory()->create([
             'achievements_published' => 10,
@@ -111,12 +116,12 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
             'time_taken_hardcore' => 3000,
         ]);
         PlayerAchievementSet::create([
-            'user_id' => $unrankedUser->id,
+            'user_id' => $unrankedUser->id, // this should be excluded
             'achievement_set_id' => $achievementSet->id,
             'achievements_unlocked' => 10,
             'achievements_unlocked_hardcore' => 10,
             'time_taken' => 30,
-            'time_taken_hardcore' => 30, // this should be excluded
+            'time_taken_hardcore' => 30,
         ]);
 
         // Act
@@ -128,11 +133,123 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
         $this->assertEquals(2000, $achievementSet->median_time_to_complete_hardcore); // median of [1000, 2000, 3000] = 2000
     }
 
+    public function testItExcludesAllUsersFromTimeToBeatMedianCalculationWhenNoAchievementsExist(): void
+    {
+        // Arrange
+        $system = System::factory()->create();
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => null]);
+
+        $rankedUser1 = User::factory()->create();
+        $rankedUser2 = User::factory()->create();
+        $rankedUser3 = User::factory()->create();
+
+        $unrankedUser = User::factory()->create();
+        UnrankedUser::create(['user_id' => $unrankedUser->id]);
+
+        PlayerGame::factory()->create([
+            'user_id' => $rankedUser1->id,
+            'game_id' => $game->id,
+            'time_to_beat_hardcore' => 100,
+            'beaten_hardcore_at' => Carbon::now(),
+        ]);
+        PlayerGame::factory()->create([
+            'user_id' => $rankedUser2->id,
+            'game_id' => $game->id,
+            'time_to_beat_hardcore' => 200,
+            'beaten_hardcore_at' => Carbon::now(),
+        ]);
+        PlayerGame::factory()->create([
+            'user_id' => $rankedUser3->id,
+            'game_id' => $game->id,
+            'time_to_beat_hardcore' => 300,
+            'beaten_hardcore_at' => Carbon::now(),
+        ]);
+        PlayerGame::factory()->create([
+            'user_id' => $unrankedUser->id, // this should be excluded
+            'game_id' => $game->id,
+            'time_to_beat_hardcore' => 30,
+            'beaten_hardcore_at' => Carbon::now(),
+        ]);
+
+        // Act
+        (new UpdateGameBeatenMetricsAction())->execute($game);
+
+        // Assert
+        $game->refresh();
+        $this->assertEquals(0, $game->times_beaten_hardcore);
+        $this->assertNull($game->median_time_to_beat_hardcore);
+    }
+
+    public function testItExcludesAllUsersFromTimeToCompleteMedianCalculationWhenNoAchievementsExist(): void
+    {
+        // Arrange
+        $system = System::factory()->create();
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => null]);
+
+        $achievementSet = AchievementSet::factory()->create([
+            'achievements_published' => null,
+            'players_total' => 0,
+            'players_hardcore' => 0,
+        ]);
+        GameAchievementSet::factory()->create([
+            'game_id' => $game->id,
+            'achievement_set_id' => $achievementSet->id,
+        ]);
+
+        $rankedUser1 = User::factory()->create();
+        $rankedUser2 = User::factory()->create();
+        $rankedUser3 = User::factory()->create();
+
+        $unrankedUser = User::factory()->create();
+        UnrankedUser::create(['user_id' => $unrankedUser->id]);
+
+        PlayerAchievementSet::create([
+            'user_id' => $rankedUser1->id,
+            'achievement_set_id' => $achievementSet->id,
+            'achievements_unlocked' => 10,
+            'achievements_unlocked_hardcore' => 10,
+            'time_taken' => 1000,
+            'time_taken_hardcore' => 1000,
+        ]);
+        PlayerAchievementSet::create([
+            'user_id' => $rankedUser2->id,
+            'achievement_set_id' => $achievementSet->id,
+            'achievements_unlocked' => 10,
+            'achievements_unlocked_hardcore' => 10,
+            'time_taken' => 2000,
+            'time_taken_hardcore' => 2000,
+        ]);
+        PlayerAchievementSet::create([
+            'user_id' => $rankedUser3->id,
+            'achievement_set_id' => $achievementSet->id,
+            'achievements_unlocked' => 10,
+            'achievements_unlocked_hardcore' => 10,
+            'time_taken' => 3000,
+            'time_taken_hardcore' => 3000,
+        ]);
+        PlayerAchievementSet::create([
+            'user_id' => $unrankedUser->id, // this should be excluded
+            'achievement_set_id' => $achievementSet->id,
+            'achievements_unlocked' => 10,
+            'achievements_unlocked_hardcore' => 10,
+            'time_taken' => 30,
+            'time_taken_hardcore' => 30,
+        ]);
+
+        // Act
+        (new UpdateGameBeatenMetricsAction())->execute($game);
+
+        // Assert
+        $achievementSet->refresh();
+        $this->assertEquals(0, $achievementSet->times_completed_hardcore);
+        $this->assertNull($achievementSet->median_time_to_complete_hardcore);
+    }
+
     public function testItHandlesSoftcoreTimesCorrectly(): void
     {
         // Arrange
         $system = System::factory()->create();
-        $game = Game::factory()->create(['system_id' => $system->id]);
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => 6]);
 
         $rankedUser1 = User::factory()->create();
         $rankedUser2 = User::factory()->create();
@@ -145,18 +262,24 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
             'game_id' => $game->id,
             'time_to_beat' => 500,
             'time_to_beat_hardcore' => null, // !!
+            'beaten_at' => Carbon::now(),
+            'beaten_hardcore_at' => null, // !!
         ]);
         PlayerGame::factory()->create([
             'user_id' => $rankedUser2->id,
             'game_id' => $game->id,
             'time_to_beat' => 700,
             'time_to_beat_hardcore' => null, // !!
+            'beaten_at' => Carbon::now(),
+            'beaten_hardcore_at' => null, // !!
         ]);
         PlayerGame::factory()->create([
-            'user_id' => $unrankedUser->id,
+            'user_id' => $unrankedUser->id, // should be excluded
             'game_id' => $game->id,
-            'time_to_beat' => 30, // should be excluded
+            'time_to_beat' => 30,
             'time_to_beat_hardcore' => null, // !!
+            'beaten_at' => Carbon::now(),
+            'beaten_hardcore_at' => null, // !!
         ]);
 
         // Act
@@ -172,7 +295,7 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
     {
         // Arrange
         $system = System::factory()->create();
-        $game = Game::factory()->create(['system_id' => $system->id]);
+        $game = Game::factory()->create(['system_id' => $system->id, 'achievements_published' => 6]);
 
         $unrankedUser = User::factory()->create();
         UnrankedUser::create(['user_id' => $unrankedUser->id]);
@@ -181,6 +304,7 @@ class UpdateGameBeatenMetricsActionTest extends TestCase
             'user_id' => $unrankedUser->id,
             'game_id' => $game->id,
             'time_to_beat_hardcore' => 100,
+            'beaten_hardcore_at' => Carbon::now(),
         ]);
 
         // Act

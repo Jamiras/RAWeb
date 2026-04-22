@@ -25,6 +25,8 @@ use App\Models\PlayerBadgeStage;
 use App\Models\PlayerSession;
 use App\Models\System;
 use App\Platform\Commands\BackfillAuthorYieldUnlocks;
+use App\Platform\Commands\BackfillGameScreenshots;
+use App\Platform\Commands\ConvertGameToEvent;
 use App\Platform\Commands\CrawlPlayerWeightedPoints;
 use App\Platform\Commands\CreateAchievementOfTheWeek;
 use App\Platform\Commands\DeleteStalePlayerPointsStatsEntries;
@@ -78,6 +80,8 @@ class AppServiceProvider extends ServiceProvider
                 RecalculateAchievementWeightedPoints::class,
 
                 // Games
+                BackfillGameScreenshots::class,
+                ConvertGameToEvent::class,
                 PruneDuplicateSubsetNotes::class,
                 PruneGameRecentPlayers::class,
                 UpdateGameAchievementsMetrics::class,
@@ -137,7 +141,7 @@ class AppServiceProvider extends ServiceProvider
             /** @var Schedule $schedule */
             $schedule = $this->app->make(Schedule::class);
 
-            $schedule->command(UpdateSearchIndexForQueuedEntities::class)->twiceDaily(1, 13); // 1AM and 1PM UTC
+            $schedule->command(UpdateSearchIndexForQueuedEntities::class)->hourly();
             $schedule->command(PruneGameRecentPlayers::class)->daily();
             $schedule->command(DeleteStalePlayerPointsStatsEntries::class)->weekly();
 

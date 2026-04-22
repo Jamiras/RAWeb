@@ -31,9 +31,7 @@ class AchievementSchema extends Schema
     /**
      * Relationships that should always be eager loaded.
      */
-    protected array $with = [
-        'achievementSet.gameAchievementSets',
-    ];
+    protected array $with = ['achievementSet.gameAchievementSets'];
 
     /**
      * Default pagination parameters when client doesn't provide any.
@@ -84,10 +82,10 @@ class AchievementSchema extends Schema
 
             HasOne::make('achievementSet')->type('achievement-sets')->readOnly(),
             HasMany::make('games')->type('games')->readOnly(),
+            HasMany::make('playerAchievements')->type('player-achievements')->cannotEagerLoad()->readOnly(),
 
             // TODO add relationships
             // - activeMaintainer (HasOne AchievementMaintainer)
-            // - playerAchievements (HasMany PlayerAchievement)
 
             // TODO implement relationship endpoints to enable links
             // - /achievements/{id}/achievementSet
@@ -104,7 +102,7 @@ class AchievementSchema extends Schema
         return [
             WhereIdIn::make($this),
             Scope::make('state', 'withState'),
-            Scope::make('gameId', 'forGame'),
+            Scope::make('gameId', 'forGameId'),
             WhereIn::make('type')->delimiter(','),
         ];
     }

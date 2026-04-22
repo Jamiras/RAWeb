@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Platform\Enums\AchievementPoints;
 use App\Platform\Enums\AchievementType;
 use BackedEnum;
-use Closure;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Infolists;
@@ -70,7 +69,10 @@ class AchievementResource extends Resource
      */
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()->with(['game.system']);
+        /** @var Builder<Achievement> $query */
+        $query = parent::getGlobalSearchEloquentQuery()->with(['game.system']);
+
+        return $query;
     }
 
     /**
@@ -150,6 +152,17 @@ class AchievementResource extends Resource
                         Infolists\Components\TextEntry::make('order_column')
                             ->label('Display Order'),
                     ]),
+
+                Schemas\Components\Section::make('Video')
+                    ->icon('heroicon-o-video-camera')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('embed_url')
+                            ->label('Video URL')
+                            ->url(fn (Achievement $record): string => $record->embed_url ?? '')
+                            ->extraAttributes(['class' => 'underline'])
+                            ->placeholder('none'),
+                    ])
+                    ->visible(fn (?Achievement $record): bool => !empty($record?->embed_url)),
 
                 Schemas\Components\Section::make('Maintainer')
                     ->icon('heroicon-o-user')
@@ -266,24 +279,41 @@ class AchievementResource extends Resource
                             ->disabled(!$user->can('updateField', [$schema->model, 'type'])),
                     ]),
 
-                Schemas\Components\Section::make('Video (Deprecated)')
+                Schemas\Components\Section::make('Video')
                     ->icon('heroicon-o-video-camera')
-                    ->description(new HtmlString('This field is deprecated and will be replaced with on-site guides. <a href="https://github.com/RetroAchievements/RAWeb/discussions/4196" target="_blank" class="underline">See RFC</a>'))
+                    ->description(new HtmlString('This field will eventually be replaced with on-site tips and guides. <a href="https://github.com/RetroAchievements/RAWeb/discussions/4196" target="_blank" class="underline">See RFC</a>'))
                     ->schema([
                         Forms\Components\TextInput::make('embed_url')
-                            ->label('Video URL')
+                            ->label('YouTube Video URL')
+                            ->placeholder('https://www.youtube.com/watch?v=...')
+                            ->url()
                             ->maxLength(255)
-                            ->disabled(!$user->can('updateField', [$schema->model, 'embed_url']))
                             ->rules([
-                                fn (?Achievement $record): Closure => function (string $attribute, $value, Closure $fail) use ($record) {
-                                    // Only allow clearing the field, not changing to a different value.
-                                    if (!empty($value) && $value !== $record?->embed_url) {
-                                        $fail('This field is deprecated. You can only clear it, not change it to a different URL.');
+                                fn () => function (string $attribute, $value, $fail) {
+                                    if (empty($value)) {
+                                        return;
+                                    }
+
+                                    // Only allow youtube.com/watch?v= and youtu.be/ links.
+                                    $isYouTube = (bool) preg_match(
+                                        '/^https?:\/\/(www\.)?youtube\.com\/watch\?.*v=[\w-]+/i',
+                                        $value
+                                    );
+
+                                    if (!$isYouTube) {
+                                        $isYouTube = (bool) preg_match(
+                                            '/^https?:\/\/youtu\.be\/[\w-]+/i',
+                                            $value
+                                        );
+                                    }
+
+                                    if (!$isYouTube) {
+                                        $fail('The URL must be a YouTube video link (youtube.com/watch?v= or youtu.be/).');
                                     }
                                 },
-                            ]),
-                    ])
-                    ->visible(fn (?Achievement $record): bool => !empty($record?->embed_url)),
+                            ])
+                            ->disabled(!$user->can('updateField', [$schema->model, 'embed_url'])),
+                    ]),
 
                 Schemas\Components\Section::make('Media')
                     ->icon('heroicon-s-photo')
@@ -480,7 +510,8 @@ class AchievementResource extends Resource
 
                     Actions\Action::make('audit-log')
                         ->url(fn ($record) => AchievementResource::getUrl('audit-log', ['record' => $record]))
-                        ->icon('fas-clock-rotate-left'),
+                        ->icon('fas-clock-rotate-left')
+                        ->visible(fn ($record): bool => Auth::user()->can('viewModifications', $record)),
                 ]),
             ])
             ->toolbarActions([
@@ -500,11 +531,21 @@ class AchievementResource extends Resource
 
     public static function getRecordSubNavigation(Page $page): array
     {
-        return $page->generateNavigationItems([
+        /** @var User $user */
+        $user = Auth::user();
+
+        $record = method_exists($page, 'getRecord') ? $page->getRecord() : null;
+
+        $items = [
             Pages\Details::class,
             Pages\Logic::class,
-            Pages\AuditLog::class,
-        ]);
+        ];
+
+        if ($record && $user->can('viewModifications', $record)) {
+            $items[] = Pages\AuditLog::class;
+        }
+
+        return $page->generateNavigationItems($items);
     }
 
     public static function getPages(): array
@@ -523,11 +564,14 @@ class AchievementResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        /** @var Builder<Achievement> $query */
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ])
             ->with(['activeMaintainer.user', 'game']);
+
+        return $query;
     }
 
     public static function buildMaintainerForm(?Achievement $record): array

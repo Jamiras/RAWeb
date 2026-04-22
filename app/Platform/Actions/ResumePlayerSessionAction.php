@@ -34,6 +34,7 @@ class ResumePlayerSessionAction
         $isBackdated = ($timestamp && $timestamp->diffInMinutes(Carbon::now(), true) > $sessionKeepAliveTimeInMinutes);
 
         $timestamp ??= Carbon::now();
+        $activeSessionCutoff = $timestamp->clone()->subMinutes($sessionKeepAliveTimeInMinutes);
 
         /** @var ?PlayerSession $playerSession */
         $playerSession = null;
@@ -60,6 +61,7 @@ class ResumePlayerSessionAction
             // look for an active session
             $playerSession = $user->playerSessions()
                 ->where('game_id', $game->id)
+                ->where('rich_presence_updated_at', '>=', $activeSessionCutoff)
                 ->where(function ($query) use ($gameHash, $isMultiDiscGameHash) {
                     if ($gameHash && !$isMultiDiscGameHash) {
                         $query->where('game_hash_id', $gameHash->id)
@@ -154,7 +156,7 @@ class ResumePlayerSessionAction
                 $playerSession->save(['touch' => true]);
 
                 if ($doesUserNeedsUpdate) {
-                    $user->saveQuietly();
+                    DB::transaction(fn () => $user->saveQuietly(), attempts: 3);
                 }
 
                 if (!$isBackdated) {
@@ -173,7 +175,7 @@ class ResumePlayerSessionAction
         // TODO deprecated, read from last player_sessions entry where needed
         $user->rich_presence = utf8_sanitize($presence);
         $user->rich_presence_updated_at = $timestamp;
-        $user->saveQuietly();
+        DB::transaction(fn () => $user->saveQuietly(), attempts: 3);
 
         // create new session
         $playerSession = new PlayerSession([
@@ -263,6 +265,6 @@ class ResumePlayerSessionAction
                 ['game_id', 'user_id'],
                 $columnsToUpdate,
             );
-        }, 3);
+        }, attempts: 3);
     }
 }

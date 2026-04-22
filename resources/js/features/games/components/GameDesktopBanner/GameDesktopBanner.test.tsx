@@ -11,6 +11,7 @@ describe('Component: GameDesktopBanner', () => {
     const { container } = render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
         backingGame: createGame(),
+        can: {},
         game: createGame(),
         isOnWantToPlayList: false,
       },
@@ -28,6 +29,7 @@ describe('Component: GameDesktopBanner', () => {
       pageProps: {
         game,
         backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -45,8 +47,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -67,8 +70,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -88,6 +92,7 @@ describe('Component: GameDesktopBanner', () => {
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
         backingGame: createGame(),
+        can: {},
         game: createGame(),
         isOnWantToPlayList: false,
       },
@@ -109,6 +114,7 @@ describe('Component: GameDesktopBanner', () => {
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
         backingGame: createGame(),
+        can: {},
         game: createGame(),
         isOnWantToPlayList: false,
       },
@@ -128,6 +134,7 @@ describe('Component: GameDesktopBanner', () => {
       pageProps: {
         backingGame,
         game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -142,8 +149,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
-        game, // !! same id as backingGame
+        game,
+        backingGame: game, // !! same id as backingGame
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -162,8 +170,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -174,7 +183,7 @@ describe('Component: GameDesktopBanner', () => {
     expect(blurredImg).toHaveStyle({ filter: 'blur(15px)' });
   });
 
-  it('given banner sources are null, renders a fallback banner with solid background color', () => {
+  it('given banner sources are null, does not render the blurred backdrop', () => {
     // ARRANGE
     const banner = createPageBanner({
       desktopMdWebp: null,
@@ -184,56 +193,49 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
 
     // ASSERT
     expect(screen.queryByTestId('blurred-backdrop')).not.toBeInTheDocument();
-
-    const bannerEl = screen.getByTestId('desktop-banner');
-    expect(bannerEl).toBeInTheDocument();
-    expect(bannerEl.style.background).toEqual('#0a0a0a');
   });
 
-  it('given no custom banner, uses a fixed compact height regardless of preference', () => {
+  it('given a fallback banner, uses a fixed compact height regardless of preference', () => {
     // ARRANGE
-    const banner = createPageBanner({
-      desktopMdWebp: null,
-      desktopMdAvif: null,
-    });
+    const banner = createPageBanner({ isFallback: true });
     const game = createGame();
 
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'expanded',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
     // ASSERT
     const bannerEl = screen.getByTestId('desktop-banner');
 
-    expect(bannerEl).toHaveClass('lg:h-[212px]'); // fallback always uses fixed compact height
+    expect(bannerEl).toHaveClass('lg:h-[212px]');
     expect(bannerEl).not.toHaveClass('lg:!h-[474px]');
   });
 
-  it('given no custom banner, does not render the expand/collapse button', () => {
+  it('given a fallback banner, does not render the expand/collapse button', () => {
     // ARRANGE
-    const banner = createPageBanner({
-      desktopMdWebp: null,
-      desktopMdAvif: null,
-    });
+    const banner = createPageBanner({ isFallback: true });
     const game = createGame();
 
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -243,27 +245,29 @@ describe('Component: GameDesktopBanner', () => {
     expect(screen.queryByRole('button', { name: /collapse banner/i })).not.toBeInTheDocument();
   });
 
-  it('given no custom banner, renders the color-extracted background from the ingame screenshot', () => {
+  it('given a fallback banner, still renders the blurred backdrop and banner image', () => {
     // ARRANGE
     const banner = createPageBanner({
-      desktopMdWebp: null,
-      desktopMdAvif: null,
+      desktopMdWebp: '/assets/images/banner/fallback-desktop-md.webp',
+      isFallback: true,
     });
-    const game = createGame({ imageIngameUrl: 'https://example.com/ingame.jpg' });
+    const game = createGame();
 
     render(<GameDesktopBanner banner={banner} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
 
     // ASSERT
-    const colorSourceImg = screen.getByTestId('fallback-color-source');
-
-    expect(colorSourceImg).toBeInTheDocument();
-    expect(colorSourceImg).toHaveAttribute('src', 'https://example.com/ingame.jpg');
+    const blurredBackdrop = screen.getByTestId('blurred-backdrop');
+    expect(blurredBackdrop).toHaveAttribute(
+      'src',
+      '/assets/images/banner/fallback-desktop-md.webp',
+    );
   });
 
   it('given a title longer than 30 characters, applies smaller text size for mobile', () => {
@@ -273,8 +277,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -293,8 +298,9 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
+        backingGame: game,
+        can: {},
         isOnWantToPlayList: false,
       },
     });
@@ -312,10 +318,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'normal',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -329,10 +336,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'compact',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -346,10 +354,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'expanded',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -363,10 +372,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'compact',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -381,10 +391,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'expanded',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -399,10 +410,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'normal',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -432,10 +444,11 @@ describe('Component: GameDesktopBanner', () => {
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'normal',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
@@ -447,16 +460,51 @@ describe('Component: GameDesktopBanner', () => {
     expect(bannerEl).toHaveClass('border-neutral-500');
   });
 
+  it('given the user can manage games, shows the manage chip', () => {
+    // ARRANGE
+    const game = createGame({ id: 1 });
+
+    render(<GameDesktopBanner banner={createPageBanner()} />, {
+      pageProps: {
+        game,
+        backingGame: game,
+        can: { manageGames: true },
+        isOnWantToPlayList: false,
+      },
+    });
+
+    // ASSERT
+    expect(screen.getByRole('link', { name: /manage/i })).toBeVisible();
+  });
+
+  it('given the user cannot manage games, does not show the manage chip', () => {
+    // ARRANGE
+    const game = createGame({ id: 1 });
+
+    render(<GameDesktopBanner banner={createPageBanner()} />, {
+      pageProps: {
+        game,
+        backingGame: game,
+        can: { manageGames: false },
+        isOnWantToPlayList: false,
+      },
+    });
+
+    // ASSERT
+    expect(screen.queryByRole('link', { name: /manage/i })).not.toBeInTheDocument();
+  });
+
   it('given the toggle button is unhovered, reverts the border color', async () => {
     // ARRANGE
     const game = createGame();
 
     render(<GameDesktopBanner banner={createPageBanner()} />, {
       pageProps: {
-        backingGame: game,
         game,
-        isOnWantToPlayList: false,
+        backingGame: game,
         bannerPreference: 'normal',
+        can: {},
+        isOnWantToPlayList: false,
       },
     });
 
