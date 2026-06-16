@@ -39,14 +39,14 @@ abstract class BaseAuthenticatedApiAction extends BaseApiAction
 
     private function authenticateFromRequest(Request $request): ?array
     {
-        $username = request()->input('u');
+        $username = $request->input('u');
         if (!$username) {
             // no user specified
             return $this->invalidCredentials();
         }
 
         // this pulls the user associated to the 't' parameter
-        $this->user = request()->user('connect-token');
+        $this->user = $request->user('connect-token');
 
         if (!$this->user) {
             // no user found for provided token
@@ -82,5 +82,15 @@ abstract class BaseAuthenticatedApiAction extends BaseApiAction
             'Code' => 'invalid_credentials',
             'Error' => 'Invalid user/token combination.',
         ];
+    }
+
+    protected function mustBeDeveloper(): array
+    {
+        return $this->accessDenied('You must be a developer to perform this action! Please drop a message in the forums to apply.');
+    }
+
+    protected function mustHaveActiveClaim(): array
+    {
+        return $this->accessDenied('You must have an active claim on this game to perform this action.');
     }
 }

@@ -16,7 +16,6 @@ use App\Models\Game;
 use App\Models\GameAchievementSet;
 use App\Models\GameScreenshot;
 use App\Models\GameSet;
-use App\Models\PlayerAchievementSet;
 use App\Models\PlayerGame;
 use App\Models\Role;
 use App\Models\Ticket;
@@ -226,8 +225,8 @@ class BuildGameShowPagePropsAction
         $targetAchievementSetPlayersTotal = null;
         $targetAchievementSetPlayersHardcore = null;
         if ($targetAchievementSet !== null && $targetAchievementSet->type !== AchievementSetType::Core) {
-            [$targetAchievementSetPlayersTotal, $targetAchievementSetPlayersHardcore] =
-                $this->getAchievementSetPlayerCounts($targetAchievementSet->achievement_set_id);
+            $targetAchievementSetPlayersTotal = $targetAchievementSet->achievementSet->players_total;
+            $targetAchievementSetPlayersHardcore = $targetAchievementSet->achievementSet->players_hardcore;
         }
 
         $subscriptionService = new SubscriptionService();
@@ -285,7 +284,9 @@ class BuildGameShowPagePropsAction
                 'gameAchievementSets.achievementSet.timesCompletedHardcore',
                 'genre',
                 'imageBoxArtUrl',
+                'imageIngameDimensions',
                 'imageIngameUrl',
+                'imageTitleDimensions',
                 'imageTitleUrl',
                 'medianTimeToBeat',
                 'medianTimeToBeatHardcore',
@@ -353,8 +354,8 @@ class BuildGameShowPagePropsAction
             numLeaderboards: $this->gameLeaderboardService->getCount($backingGame, $isPromoted),
             numMasters: $numMasters,
             numOpenTickets: $isPromoted
-                ? Ticket::forGame($backingGame)->unresolved()->officialCore()->count()
-                : Ticket::forGame($backingGame)->unresolved()->unofficial()->count(),
+                ? Ticket::forGame($backingGame)->open()->promoted()->count()
+                : Ticket::forGame($backingGame)->open()->unpromoted()->count(),
 
             numScreenshots: $game->gameScreenshots()->approved()->count(),
             screenshots: Lazy::inertiaDeferred(fn () => $game->gameScreenshots()
@@ -387,6 +388,8 @@ class BuildGameShowPagePropsAction
 
             selectableGameAchievementSets: $game->getAttribute('selectableGameAchievementSets')
                 ->map(function ($gas) {
+                    $gas->order_column ??= 0;
+
                     $gas->achievementSet->setRelation('achievements', collect());
 
                     $gas->achievementSet->median_time_to_complete ??= 0;
@@ -439,7 +442,7 @@ class BuildGameShowPagePropsAction
         }
 
         // Only include screenshot upload data when the user can create screenshots.
-        if ($user && $user->can('create', [GameScreenshot::class, $game])) {
+        if ($user && $user->can('create', [GameScreenshot::class, $backingGame])) {
             $propsData = $propsData->include(
                 'screenshotUploadStatuses',
                 'screenshotUploadConsistency',
@@ -591,30 +594,6 @@ class BuildGameShowPagePropsAction
     }
 
     /**
-     * Get actual player counts for a specific achievement set from player_achievement_sets.
-     *
-     * @return array{int, int} [$playersTotal, $playersHardcore]
-     */
-    private function getAchievementSetPlayerCounts(int $achievementSetId): array
-    {
-        $playersTotal = PlayerAchievementSet::query()
-            ->where('achievement_set_id', $achievementSetId)
-            ->where('achievements_unlocked', '>', 0)
-            ->leftJoin('unranked_users', 'player_achievement_sets.user_id', '=', 'unranked_users.user_id')
-            ->whereNull('unranked_users.id')
-            ->count();
-
-        $playersHardcore = PlayerAchievementSet::query()
-            ->where('achievement_set_id', $achievementSetId)
-            ->where('achievements_unlocked_hardcore', '>', 0)
-            ->leftJoin('unranked_users', 'player_achievement_sets.user_id', '=', 'unranked_users.user_id')
-            ->whereNull('unranked_users.id')
-            ->count();
-
-        return [$playersTotal, $playersHardcore];
-    }
-
-    /**
      * Builds the upload consistency baseline from the game's valid approved
      * primary screenshots. Returns null when there is no valid baseline, and
      * omits canonicalResolution when multiple valid sizes already exist.
@@ -627,12 +606,18 @@ class BuildGameShowPagePropsAction
         $system = $game->system;
         $resolutionService = new ScreenshotResolutionService();
 
-        $existingResolutions = $game->gameScreenshots()
+        $rawScreenshots = $game->gameScreenshots()
             ->approved()
             ->where('is_primary', true)
             ->whereNotNull('width')
             ->whereNotNull('height')
-            ->get(['width', 'height'])
+            ->get(['width', 'height']);
+
+        if ($rawScreenshots->isEmpty()) {
+            return null;
+        }
+
+        $existingResolutions = $rawScreenshots
             ->map(fn (GameScreenshot $screenshot) => $system
                 ? $resolutionService->getNormalizedResolution($screenshot->width, $screenshot->height, $system)
                 : ['width' => $screenshot->width, 'height' => $screenshot->height]
@@ -642,10 +627,6 @@ class BuildGameShowPagePropsAction
             ->sortBy(fn (array $resolution) => "{$resolution['width']}x{$resolution['height']}")
             ->values()
             ->all();
-
-        if ($existingResolutions === []) {
-            return null;
-        }
 
         $canonicalResolution = count($existingResolutions) === 1
             ? "{$existingResolutions[0]['width']}x{$existingResolutions[0]['height']}"

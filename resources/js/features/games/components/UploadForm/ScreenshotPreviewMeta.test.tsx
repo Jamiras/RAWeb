@@ -39,7 +39,108 @@ describe('Component: ScreenshotPreviewMeta', () => {
     expect(screen.getByText(/invalid resolution/i)).toBeVisible();
   });
 
-  it('given the resolution is valid but inconsistent with canonical screenshots, shows an advisory warning message', () => {
+  it('given the resolution is invalid on an upscaling-capable system, shows the upscaling explanation', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={1920}
+        height={1080}
+        isResolutionValid={false}
+        supportsUpscaledScreenshots={true}
+      />,
+    );
+
+    // ASSERT
+    expect(screen.getByText(/native, 2x, or 3x internal resolution/i)).toBeVisible();
+    expect(screen.getByText(/not a desktop capture or manual resize/i)).toBeVisible();
+  });
+
+  it('given the resolution is invalid on a non-upscaling system, shows the native-only explanation', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={1920}
+        height={1080}
+        isResolutionValid={false}
+        supportsUpscaledScreenshots={false}
+      />,
+    );
+
+    // ASSERT
+    expect(
+      screen.getByText(/at native resolution, not a desktop capture or manual resize/i),
+    ).toBeVisible();
+    expect(screen.queryByText(/2x, or 3x/i)).not.toBeInTheDocument();
+  });
+
+  it('given a 1x capture on an upscaling-capable system, shows the 1x nudge', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={320}
+        height={240}
+        isResolutionValid={true}
+        supportsUpscaledScreenshots={true}
+        is1xCapture={true}
+      />,
+    );
+
+    // ASSERT
+    expect(screen.getByText(/1x capture, render at 2x or 3x/i)).toBeVisible();
+  });
+
+  it('given a 1x capture on a non-upscaling system, does not show the 1x nudge', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={256}
+        height={224}
+        isResolutionValid={true}
+        supportsUpscaledScreenshots={false}
+        is1xCapture={true}
+      />,
+    );
+
+    // ASSERT
+    expect(screen.queryByText(/1x capture/i)).not.toBeInTheDocument();
+  });
+
+  it('given an upscaled capture (not 1x) on an upscaling-capable system, does not show the 1x nudge', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={640}
+        height={480}
+        isResolutionValid={true}
+        supportsUpscaledScreenshots={true}
+        is1xCapture={false}
+      />,
+    );
+
+    // ASSERT
+    expect(screen.queryByText(/1x capture/i)).not.toBeInTheDocument();
+  });
+
+  it('given both 1x nudge and consistency nudge conditions are true, only the 1x nudge renders', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={320}
+        height={240}
+        isResolutionValid={true}
+        supportsUpscaledScreenshots={true}
+        is1xCapture={true}
+        hasConsistencyWarning={true}
+        selectedType="ingame"
+      />,
+    );
+
+    // ASSERT
+    expect(screen.getByText(/1x capture/i)).toBeVisible();
+    expect(screen.queryByText(/more likely to be accepted/i)).not.toBeInTheDocument();
+  });
+
+  it('given the user is uploading an in-game screenshot with a consistency warning, nudges them to also submit a title', () => {
     // ARRANGE
     render(
       <ScreenshotPreviewMeta
@@ -47,16 +148,18 @@ describe('Component: ScreenshotPreviewMeta', () => {
         height={240}
         isResolutionValid={true}
         hasConsistencyWarning={true}
-        canonicalResolution="256x224"
+        selectedType="ingame"
       />,
     );
 
     // ASSERT
     expect(screen.getByText(/valid resolution/i)).toBeVisible();
-    expect(screen.getByText(/doesn't match existing screenshots \(256x224\)/i)).toBeVisible();
+    expect(
+      screen.getByText(/then submit a matching title screenshot at this resolution/i),
+    ).toBeVisible();
   });
 
-  it('given the resolution is valid but inconsistent with mixed screenshots, shows a generic advisory message', () => {
+  it('given the user is uploading a title screenshot with a consistency warning, nudges them to also submit an in-game', () => {
     // ARRANGE
     render(
       <ScreenshotPreviewMeta
@@ -64,10 +167,47 @@ describe('Component: ScreenshotPreviewMeta', () => {
         height={240}
         isResolutionValid={true}
         hasConsistencyWarning={true}
+        selectedType="title"
       />,
     );
 
     // ASSERT
-    expect(screen.getByText(/doesn't match existing screenshots/i)).toBeVisible();
+    expect(
+      screen.getByText(/then submit a matching in-game screenshot at this resolution/i),
+    ).toBeVisible();
+  });
+
+  it('given the user is uploading a completion screenshot with a consistency warning, shows the generic matching nudge', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={320}
+        height={240}
+        isResolutionValid={true}
+        hasConsistencyWarning={true}
+        selectedType="completion"
+      />,
+    );
+
+    // ASSERT
+    expect(screen.getByText(/then submit matching screenshots at this resolution/i)).toBeVisible();
+    expect(screen.queryByText(/title screenshot/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/in-game screenshot/i)).not.toBeInTheDocument();
+  });
+
+  it('given there is no consistency warning, does not render any matching-screenshot nudge', () => {
+    // ARRANGE
+    render(
+      <ScreenshotPreviewMeta
+        width={320}
+        height={240}
+        isResolutionValid={true}
+        hasConsistencyWarning={false}
+        selectedType="ingame"
+      />,
+    );
+
+    // ASSERT
+    expect(screen.queryByText(/more likely to be accepted/i)).not.toBeInTheDocument();
   });
 });

@@ -60,6 +60,11 @@ class AchievementPolicy
         return true;
     }
 
+    public function viewComments(?User $user, Achievement $achievement): bool
+    {
+        return true;
+    }
+
     public function viewPlayerAchievements(?User $user, Achievement $achievement): bool
     {
         return true;
@@ -147,7 +152,7 @@ class AchievementPolicy
     public function updateField(User $user, ?Achievement $achievement, string $fieldName): bool
     {
         $roleFieldPermissions = [
-            Role::DEVELOPER_JUNIOR => ['title', 'description', 'type', 'points', 'order_column'],
+            Role::DEVELOPER_JUNIOR => ['title', 'description', 'type', 'points', 'order_column', 'image_name'],
             Role::DEVELOPER => ['title', 'description', 'is_promoted', 'type', 'points', 'order_column', 'embed_url', 'image_name'],
             Role::WRITER => ['title', 'description'],
             Role::ARTIST => ['image_name'],

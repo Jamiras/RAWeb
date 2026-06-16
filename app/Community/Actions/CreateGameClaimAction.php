@@ -15,6 +15,7 @@ use App\Models\AchievementSetClaim;
 use App\Models\Game;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Platform\Actions\RevalidateMediaContributionBadgeEligibilityAction;
 use App\Support\Alerts\ClaimWithUnresolvedTicketsAlert;
 use App\Support\Cache\CacheKey;
 use Carbon\Carbon;
@@ -67,6 +68,8 @@ class CreateGameClaimAction
             'finished_at' => $expiresAt,
         ]);
 
+        (new RevalidateMediaContributionBadgeEligibilityAction())->execute($currentUser);
+
         Cache::forget(CacheKey::buildUserExpiringClaimsCacheKey($currentUser->username));
 
         addArticleComment("Server", CommentableType::SetClaim, $game->id,
@@ -86,7 +89,7 @@ class CreateGameClaimAction
             }
         }
 
-        $this->maybeSendClaimWithUnresolvedTicketsAlert($currentUser, $game);
+        $this->maybeSendClaimWithUnresolvedTicketsAlert($currentUser, $game, $claimType);
 
         $webhookUrl = config('services.discord.webhook.claims');
         if (!empty($webhookUrl)) {
@@ -104,13 +107,17 @@ class CreateGameClaimAction
         return $newClaim;
     }
 
-    private function maybeSendClaimWithUnresolvedTicketsAlert(User $currentUser, Game $game): void
+    private function maybeSendClaimWithUnresolvedTicketsAlert(User $currentUser, Game $game, ClaimType $claimType): void
     {
+        if ($claimType === ClaimType::Collaboration) {
+            return;
+        }
+
         if (!ClaimWithUnresolvedTicketsAlert::webhookUrl()) {
             return;
         }
 
-        $ticketCount = Ticket::forDeveloper($currentUser)->awaitingDeveloper()->count();
+        $ticketCount = Ticket::forAssignee($currentUser)->awaitingDeveloper()->count();
         if ($ticketCount < 2) { // two or more suggests the developer may be ignoring tickets
             return;
         }

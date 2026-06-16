@@ -36,7 +36,21 @@ class GameScreenshotPolicy
 
     public function create(User $user, Game $game): bool
     {
+        // non-devs shouldn't contribute screenshots for games being worked on by a dev
+        if ($game->has_active_or_in_review_claims) {
+            return false;
+        }
+
+        // "subset games" shouldn't have dedicated screenshot galleries
+        if ($game->is_subset_game) {
+            return false;
+        }
+
         if (!$user->hasRole(Role::ROOT) && !config('feature.game_screenshot_uploads')) {
+            return false;
+        }
+
+        if (!$user->hasRole(Role::ROOT) && !$user->enable_beta_features) {
             return false;
         }
 
@@ -48,15 +62,19 @@ class GameScreenshotPolicy
             return false;
         }
 
+        if ($user->unranked_at !== null && !$user->hasAnyRole([Role::DEVELOPER, Role::DEVELOPER_JUNIOR])) {
+            return false;
+        }
+
         if (!$user->hasVerifiedEmail()) {
             return false;
         }
 
-        // Either the user has enough points or their account is old enough.
+        // The user must have enough points and their account must be old enough.
         $hasEnoughPoints = $user->points_hardcore >= Rank::MIN_POINTS || $user->points >= Rank::MIN_POINTS;
-        $isOldEnough = $user->created_at && $user->created_at->diffInDays(now()) >= 14;
+        $isOldEnough = $user->created_at && $user->created_at->diffInDays(now()) >= 30;
 
-        return $hasEnoughPoints || $isOldEnough;
+        return $hasEnoughPoints && $isOldEnough;
     }
 
     public function delete(User $user, GameScreenshot $screenshot): bool
@@ -64,6 +82,21 @@ class GameScreenshotPolicy
         return
             $screenshot->captured_by_user_id === $user->id
             && $screenshot->status === GameScreenshotStatus::Pending;
+    }
+
+    public function forceDelete(User $user, GameScreenshot $screenshot): bool
+    {
+        // Only rejected screenshots may be permanently deleted.
+        if ($screenshot->status !== GameScreenshotStatus::Rejected) {
+            return false;
+        }
+
+        return $user->hasAnyRole([
+            Role::DEVELOPER,
+            Role::GAME_EDITOR,
+            Role::MEDIA_EDITOR,
+            Role::MODERATOR,
+        ]);
     }
 
     public function review(User $user, GameScreenshot $screenshot): bool

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
  * @deprecated use <x-user.avatar />
  */
 function userAvatar(
-    string|User|null $user,
+    string|array|User|null $user,
     ?bool $label = null,
     ?bool $icon = null,
     int $iconSize = 32,
@@ -79,25 +79,6 @@ function renderUserCard(string|array $user): string
     return Blade::render('<x-user-card :user="$user" />', [
         'user' => $user,
     ]);
-}
-
-function RenderUserPref(
-    int $websitePrefs,
-    int $userPref,
-    bool $setIfTrue,
-    ?string $state = null,
-    int $targetLoadingIcon = 1,
-): void {
-    echo "<input id='UserPreference$userPref' type='checkbox' ";
-    echo "onchange='DoChangeUserPrefs($targetLoadingIcon); return false;' value='1'";
-
-    if ($state) {
-        echo " $state";
-    } elseif (BitSet($websitePrefs, $userPref) === $setIfTrue) {
-        echo " checked";
-    }
-
-    echo " />";
 }
 
 function RenderUserList(string $header, array $users, UserRelationStatus $relationStatus, array $followingList): void

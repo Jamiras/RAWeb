@@ -18,4 +18,21 @@ enum ScreenshotType: string
             self::Completion => 'Completion',
         };
     }
+
+    public function approvedCap(): int
+    {
+        return match ($this) {
+            self::Title, self::Completion => 1,
+            self::Ingame => 10,
+        };
+    }
+
+    public function sortOrder(): int
+    {
+        return match ($this) {
+            self::Title => 0,
+            self::Ingame => 1,
+            self::Completion => 2,
+        };
+    }
 }

@@ -2,118 +2,9 @@
 
 use App\Models\Achievement;
 use App\Models\Game;
-use App\Models\GameHash;
 use App\Models\PlayerAchievement;
-use App\Models\PlayerGame;
-use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-
-/**
- * @deprecated see UnlockPlayerAchievementAction
- */
-function unlockAchievement(User $user, int $achievementId, bool $isHardcore, ?GameHash $gameHash = null): array
-{
-    $retVal = [
-        'Success' => false,
-    ];
-
-    $achievement = Achievement::find($achievementId);
-    if (!$achievement) {
-        $retVal['Error'] = "Data not found for achievement $achievementId";
-
-        return $retVal;
-    }
-
-    if (!$achievement->is_promoted) { // do not award Unofficial achievements
-        $retVal['Error'] = "Unofficial achievements cannot be unlocked";
-
-        return $retVal;
-    }
-
-    $hasRegular = false;
-    $hasHardcore = false;
-    $playerAchievement = PlayerAchievement::where('user_id', $user->id)
-        ->where('achievement_id', $achievementId)
-        ->first();
-    if ($playerAchievement) {
-        $hasRegular = ($playerAchievement->unlocked_at != null);
-        $hasHardcore = ($playerAchievement->unlocked_hardcore_at != null);
-    }
-    $alreadyAwarded = $isHardcore ? $hasHardcore : $hasRegular;
-
-    $playerGame = PlayerGame::where('user_id', $user->id)
-        ->where('game_id', $achievement->game_id)
-        ->first();
-
-    if (!$alreadyAwarded) {
-        // The client is expecting to receive the number of AchievementsRemaining in the response, and if
-        // it's 0, a mastery placard will be shown. Multiple achievements may be unlocked by the client at
-        // the same time using separate requests, so we need to update the unlock counts for the
-        // player_game (and commit it) as soon as possible so whichever request is processed last _should_
-        // return the correct number of remaining achievements. It will be accurately recalculated by the
-        // UpdatePlayerGameMetricsAction triggered by an asynchronous UnlockPlayerAchievementJob.
-        // Also update user points for the response, but don't immediately commit them to avoid unnecessary
-        // DB writes.
-        if ($isHardcore && !$hasHardcore) {
-            if ($playerGame) {
-                $playerGame->achievements_unlocked_hardcore++;
-                $user->points_hardcore += $achievement->points;
-
-                if ($hasRegular) {
-                    $playerGame->achievements_unlocked--;
-                    $user->points -= $achievement->points;
-                }
-
-                $playerGame->save();
-            }
-        } elseif (!$isHardcore && !$hasRegular) {
-            $user->points += $achievement->points;
-
-            if ($playerGame) {
-                $playerGame->achievements_unlocked++;
-                $playerGame->save();
-            }
-        }
-    }
-
-    if ($playerGame) {
-        if ($isHardcore) {
-            $retVal['AchievementsRemaining'] = $achievement->game->achievements_published - $playerGame->achievements_unlocked_hardcore;
-        } else {
-            $retVal['AchievementsRemaining'] = $achievement->game->achievements_published - $playerGame->achievements_unlocked;
-        }
-    } else {
-        $retVal['AchievementsRemaining'] = $achievement->game->achievements_published - 1;
-    }
-
-    if ($alreadyAwarded) {
-        if ($isHardcore && $user->isRanked() && $achievement->eventAchievements()->active()->exists()) {
-            // if event achievements are active, assume they still need to be unlocked and indicate
-            // success. this allows dorequest to forward the unlocks for the event achievements.
-            $retVal['Success'] = true;
-        }
-
-        // =============================================================================
-        // ===== DO NOT CHANGE THESE MESSAGES ==========================================
-        // The client detects the "User already has" and does not report them as errors.
-        if ($isHardcore) {
-            $retVal['Error'] = "User already has this achievement unlocked in hardcore mode.";
-        } else {
-            $retVal['Error'] = "User already has this achievement unlocked.";
-        }
-        // =============================================================================
-
-        return $retVal;
-    }
-
-    $retVal['Success'] = true;
-    // Achievements all awarded. Now housekeeping (no error handling?)
-
-    static_setlastearnedachievement($achievement->id, $user->username, $achievement->points);
-
-    return $retVal;
-}
 
 /**
  * @return Collection<int, mixed>
@@ -158,22 +49,6 @@ function getAchievementUnlocksData(
 }
 
 /**
- * Gets the number of softcore and hardcore awards for an achievement since a given time.
- */
-function getUnlocksSince(int $id, string $date): array
-{
-    $softcoreCount = PlayerAchievement::where('achievement_id', $id)
-        ->where('unlocked_at', '>', $date)->count();
-    $hardcoreCount = PlayerAchievement::where('achievement_id', $id)
-        ->where('unlocked_hardcore_at', '>', $date)->count();
-
-    return [
-        'softcoreCount' => $softcoreCount,
-        'hardcoreCount' => $hardcoreCount,
-    ];
-}
-
-/**
  * Gets a list of users who have unlocked an achievement or list of achievements within a given time-range.
  */
 function getUnlocksInDateRange(array $achievementIDs, string $startTime, string $endTime, int $hardcoreMode): array
@@ -184,38 +59,33 @@ function getUnlocksInDateRange(array $achievementIDs, string $startTime, string 
 
     $column = $hardcoreMode ? 'unlocked_hardcore_at' : 'unlocked_at';
 
-    $dateQuery = "";
-    if (strtotime($startTime)) {
-        if (strtotime($endTime)) {
-            // valid start and end
-            $dateQuery = "AND pa.$column BETWEEN '$startTime' AND '$endTime'";
-        } else {
-            // valid start, invalid end
-            $dateQuery = "AND pa.$column >= '$startTime'";
-        }
-    } else {
-        if (strtotime($endTime)) {
-            // invalid start, valid end
-            $dateQuery = "AND pa.$column <= '$endTime'";
-        } else {
-            $dateQuery = "AND pa.$column IS NOT NULL";
-        }
-    }
+    $hasValidStart = (bool) strtotime($startTime);
+    $hasValidEnd = (bool) strtotime($endTime);
 
     $userArray = [];
     foreach ($achievementIDs as $nextID) {
-        $query = "SELECT ua.username AS User
-                      FROM player_achievements AS pa
-                      INNER JOIN users AS ua ON ua.id = pa.user_id
-                      WHERE pa.achievement_id = $nextID
-                      AND ua.unranked_at IS NULL
-                      $dateQuery
-                      ORDER BY ua.username";
-        $dbResult = s_mysql_query($query);
-        if ($dbResult !== false) {
-            while ($db_entry = mysqli_fetch_assoc($dbResult)) {
-                $userArray[$nextID][] = $db_entry['User'];
-            }
+        $query = PlayerAchievement::query()
+            ->join('users', 'users.id', '=', 'player_achievements.user_id')
+            ->where('player_achievements.achievement_id', $nextID)
+            ->whereNull('users.unranked_at');
+
+        if ($hasValidStart && $hasValidEnd) {
+            $query->whereBetween("player_achievements.$column", [$startTime, $endTime]);
+        } elseif ($hasValidStart) {
+            $query->where("player_achievements.$column", '>=', $startTime);
+        } elseif ($hasValidEnd) {
+            $query->where("player_achievements.$column", '<=', $endTime);
+        } else {
+            $query->whereNotNull("player_achievements.$column");
+        }
+
+        $usernames = $query
+            ->orderBy('users.username')
+            ->pluck('users.username')
+            ->all();
+
+        foreach ($usernames as $username) {
+            $userArray[$nextID][] = $username;
         }
     }
 

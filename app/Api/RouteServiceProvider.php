@@ -13,6 +13,7 @@ use App\Api\Middleware\LogLegacyApiUsage;
 use App\Api\Middleware\ServiceAccountOnly;
 use App\Api\V1\Controllers\WebApiV1Controller;
 use App\Api\V2\Controllers\AchievementController;
+use App\Api\V2\Controllers\AchievementSetClaimController;
 use App\Api\V2\Controllers\AchievementSetController;
 use App\Api\V2\Controllers\EventController;
 use App\Api\V2\Controllers\GameController;
@@ -113,12 +114,16 @@ class RouteServiceProvider extends ServiceProvider
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
+                                    $relationships->hasMany('comments')->readOnly();
                                     $relationships->hasMany('playerAchievements')->readOnly();
                                 });
 
                             $server->resource('achievement-sets', AchievementSetController::class)
                                 ->only('show')
                                 ->readOnly();
+
+                            $server->resource('achievement-set-claims', AchievementSetClaimController::class)
+                                ->only('index');
 
                             $server->resource('events', EventController::class)
                                 ->only('index', 'show')
@@ -128,6 +133,8 @@ class RouteServiceProvider extends ServiceProvider
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
+                                    $relationships->hasMany('achievementSetClaims')->readOnly();
+                                    $relationships->hasMany('comments')->readOnly();
                                     $relationships->hasMany('hashes')->readOnly();
                                 });
 
@@ -154,9 +161,12 @@ class RouteServiceProvider extends ServiceProvider
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
+                                    $relationships->hasMany('achievementSetClaims')->readOnly();
+                                    $relationships->hasMany('awards')->readOnly();
                                     $relationships->hasMany('playerAchievements')->readOnly();
                                     $relationships->hasMany('playerAchievementSets')->readOnly();
                                     $relationships->hasMany('playerGames')->readOnly();
+                                    $relationships->hasMany('wallComments')->readOnly();
                                 });
                         });
                 });
@@ -188,7 +198,8 @@ class RouteServiceProvider extends ServiceProvider
                 /**
                  * Make sure to register a catch-all, too, to prevent the web app from ever responding
                  */
-                Route::any('/{path?}', [CatchAllController::class, 'handle'])->where('path', '(.*)');
+                Route::any('/{path?}', [CatchAllController::class, 'handle'])
+                    ->where('path', '^(?!log-viewer(?:/|$)).*');
 
             });
     }

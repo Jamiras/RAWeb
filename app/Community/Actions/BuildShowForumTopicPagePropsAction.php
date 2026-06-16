@@ -13,6 +13,7 @@ use App\Data\ShowForumTopicPagePropsData;
 use App\Data\UserData;
 use App\Data\UserPermissionsData;
 use App\Models\ForumTopic;
+use App\Models\ForumTopicComment;
 use App\Models\User;
 use App\Policies\ForumTopicCommentPolicy;
 use App\Support\Shortcode\Shortcode;
@@ -27,6 +28,7 @@ class BuildShowForumTopicPagePropsAction
         ?User $user,
         int $currentPage,
         int $perPage = ForumTopic::COMMENTS_PER_PAGE,
+        ?int $selectedCommentId = null,
     ): array {
         $paginatedForumTopicComments = $topic->visibleComments()
             ->with(['sentBy', 'editedBy'])
@@ -62,14 +64,21 @@ class BuildShowForumTopicPagePropsAction
             hubIds: $entities['hubIds'],
         );
 
-        // Get accessible team accounts for the current user.
         $accessibleTeamAccounts = null;
+        $replyableTeamAccounts = null;
         $accessibleTeamIds = [];
         if ($user) {
             $accessibleTeamIds = (new ForumTopicCommentPolicy())->getAccessibleTeamIds($user);
             if (!empty($accessibleTeamIds)) {
-                $teamUsers = User::whereIn('id', $accessibleTeamIds)->get();
+                $teamUsers = User::whereIn('id', $accessibleTeamIds)->with('roles')->get();
                 $accessibleTeamAccounts = $teamUsers->map(fn ($teamUser) => UserData::fromUser($teamUser)->include('id'));
+
+                $replyEligibleTeamUsers = $teamUsers->filter(
+                    fn (User $teamUser) => $user->can('create', [ForumTopicComment::class, $topic, $teamUser]),
+                );
+                $replyableTeamAccounts = $replyEligibleTeamUsers->isNotEmpty()
+                    ? $replyEligibleTeamUsers->values()->map(fn ($teamUser) => UserData::fromUser($teamUser)->include('id'))
+                    : null;
             }
         }
 
@@ -106,8 +115,13 @@ class BuildShowForumTopicPagePropsAction
             }
         )->all();
 
+        $comments = collect($forumTopicComments);
+        /** @var ForumTopicComment $selectedComment */
+        $selectedComment = $comments->firstWhere('id', $selectedCommentId) ?? $comments->first();
+
         $props = new ShowForumTopicPagePropsData(
             accessibleTeamAccounts: $accessibleTeamAccounts,
+            replyableTeamAccounts: $replyableTeamAccounts,
             can: UserPermissionsData::fromUser($user, forumTopic: $topic)->include(
                 'authorizeForumTopicComments',
                 'createForumTopicComments',
@@ -131,7 +145,7 @@ class BuildShowForumTopicPagePropsAction
                 total: $paginatedForumTopicComments->total(),
                 items: $forumTopicComments
             ),
-            metaDescription: Shortcode::stripAndClamp($updatedBodies[0], 220),
+            metaDescription: Shortcode::stripAndClamp($selectedComment->body, 220),
         );
 
         return ['props' => $props, 'redirectToPage' => null];

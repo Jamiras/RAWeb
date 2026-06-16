@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 
+import type { ScreenshotGalleryOptions } from '@/common/models';
 import { getScreenshotGalleryUrl } from '@/common/utils/getScreenshotGalleryUrl';
 
 /**
@@ -9,6 +10,7 @@ import { getScreenshotGalleryUrl } from '@/common/utils/getScreenshotGalleryUrl'
  */
 export function usePreloadGameScreenshots(
   screenshots: App.Platform.Data.GameScreenshot[] | undefined,
+  { isPixelated = false }: ScreenshotGalleryOptions = {},
 ) {
   const hasPreloaded = useRef(false);
 
@@ -18,11 +20,12 @@ export function usePreloadGameScreenshots(
     }
     hasPreloaded.current = true;
 
-    // The first two screenshots (title + ingame) are already visible
-    // as thumbnails, so skip them and preload the next two.
-    for (const screenshot of screenshots.slice(2, 4)) {
+    // The visible thumbnails use a different conversion than the gallery, so they don't
+    // warm the gallery cache. Preload the first few gallery-sized URLs the user is most
+    // likely to see when the dialog opens.
+    for (const screenshot of screenshots.slice(0, 4)) {
       const img = new Image();
-      img.src = getScreenshotGalleryUrl(screenshot);
+      img.src = getScreenshotGalleryUrl(screenshot, { isPixelated });
     }
   };
 

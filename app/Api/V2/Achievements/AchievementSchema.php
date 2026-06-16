@@ -81,6 +81,7 @@ class AchievementSchema extends Schema
             BelongsTo::make('developer')->type('users')->readOnly(),
 
             HasOne::make('achievementSet')->type('achievement-sets')->readOnly(),
+            HasMany::make('comments', 'visibleComments')->type('comments')->cannotEagerLoad()->readOnly(),
             HasMany::make('games')->type('games')->readOnly(),
             HasMany::make('playerAchievements')->type('player-achievements')->cannotEagerLoad()->readOnly(),
 
@@ -100,7 +101,7 @@ class AchievementSchema extends Schema
     public function filters(): array
     {
         return [
-            WhereIdIn::make($this),
+            WhereIdIn::make($this)->delimiter(','),
             Scope::make('state', 'withState'),
             Scope::make('gameId', 'forGameId'),
             WhereIn::make('type')->delimiter(','),

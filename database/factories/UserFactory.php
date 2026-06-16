@@ -51,9 +51,13 @@ class UserFactory extends Factory
             'web_api_key' => 'apiKey',
             'remember_token' => Str::random(10),
             'banned_at' => null,
+            'unranked_at' => null,
         ];
     }
 
+    /**
+     * @phpstan-return static
+     */
     public function configure(): static
     {
         /**

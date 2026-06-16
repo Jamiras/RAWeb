@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Services;
 
 use App\Enums\ClientSupportLevel;
+use App\Models\ConnectOfflineSubmissionClient;
 use App\Models\EmulatorCoreRestriction;
 use App\Models\EmulatorUserAgent;
 
@@ -330,6 +331,37 @@ class UserAgentService
             return [ClientSupportLevel::Unknown, null];
         }
 
+        [$supportLevel, $coreRestriction] = $this->resolveBaseSupportLevel($emulatorUserAgent, $data, $userAgent);
+
+        if ($supportLevel->allowsHardcoreUnlocks() && $this->hasOfflineSubmissionClient($data)) {
+            return [ClientSupportLevel::SoftcoreOnly, $coreRestriction];
+        }
+
+        if ($supportLevel === ClientSupportLevel::Full
+            && $emulatorUserAgent->pending_minimum_hardcore_version
+            && $emulatorUserAgent->pending_minimum_hardcore_version_at) {
+            if (UserAgentService::versionCompare($data['clientVersion'], $emulatorUserAgent->pending_minimum_hardcore_version) < 0) {
+                if ($emulatorUserAgent->pending_minimum_hardcore_version_at->isFuture()) {
+                    $supportLevel = ClientSupportLevel::SoftcorePending;
+                } else {
+                    // Version is already past-due. Perform the update now.
+                    $emulatorUserAgent->minimum_hardcore_version = $emulatorUserAgent->pending_minimum_hardcore_version;
+                    $emulatorUserAgent->pending_minimum_hardcore_version = null;
+                    $emulatorUserAgent->pending_minimum_hardcore_version_at = null;
+                    $emulatorUserAgent->save();
+                    $supportLevel = ClientSupportLevel::Outdated;
+                }
+            }
+        }
+
+        return [$supportLevel, $coreRestriction];
+    }
+
+    /**
+     * @return array{0: ClientSupportLevel, 1: ?EmulatorCoreRestriction}
+     */
+    private function resolveBaseSupportLevel(EmulatorUserAgent $emulatorUserAgent, array $data, string|array $userAgent): array
+    {
         $isSoftcoreOnly = $emulatorUserAgent->emulator->softcore_only;
 
         if ($emulatorUserAgent->minimum_allowed_version
@@ -435,5 +467,10 @@ class UserAgentService
         }
 
         return null;
+    }
+
+    private function hasOfflineSubmissionClient(array $data): bool
+    {
+        return ConnectOfflineSubmissionClient::whereIn('client', array_keys($data['extra'] ?? []))->exists();
     }
 }

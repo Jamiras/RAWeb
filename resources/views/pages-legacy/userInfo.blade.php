@@ -43,23 +43,16 @@ $userSetRequestInformation = getUserRequestsInformation($userPageModel);
 $userWallActive = $userMassData['UserWallActive'];
 $userIsUntracked = $userMassData['Untracked'];
 
-$recentlyPlayedSystemId = collect($userMassData['RecentlyPlayed'] ?? [])
-    ->filter(fn ($game) => System::isGameSystem($game['ConsoleID'] ?? 0) && ($game['AchievementsTotal'] ?? 0) > 0)
-    ->sortByDesc('LastPlayed')
-    ->pluck('ConsoleID')
-    ->first();
-
 $progressionCounts = (new GetUserProgressionStatusCountsAction())->execute(
-    $userPageModel,
-    $recentlyPlayedSystemId
+    $userPageModel
 );
 
 $averageCompletionPercentage = sprintf("%01.2f", $progressionCounts['avgCompletionPercentage']);
 $totalHardcoreAchievements = $progressionCounts['totalHardcoreAchievements'];
 $totalSoftcoreAchievements = $progressionCounts['totalSoftcoreAchievements'];
 
-$userAllGamesList = getUsersCompletedGamesAndMax($userPage);
-$userAwards = getUsersSiteAwards($userPageModel);
+$userAllGamesList = getUsersCompletedGamesAndMax($userPage, applyBadgePreferences: true);
+$userAwards = getUsersSiteAwards($userPageModel, applyBadgePreferences: true);
 
 $maxDisplayedGames = 200;
 $isIncomplete = fn ($game) => ($game['NumAwarded'] ?? 0) < ($game['MaxPossible'] ?? 0);

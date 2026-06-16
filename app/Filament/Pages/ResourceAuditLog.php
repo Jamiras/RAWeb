@@ -175,6 +175,7 @@ abstract class ResourceAuditLog extends \Filament\Resources\Pages\Page implement
         return match ($event) {
             'approvedScreenshot' => 'success',
             'changedScreenshotType' => 'info',
+            'clearedScreenshots' => 'danger',
             'created' => 'success',
             'creditCreated' => 'success',
             'creditDeleted' => 'danger',
@@ -192,8 +193,10 @@ abstract class ResourceAuditLog extends \Filament\Resources\Pages\Page implement
             'releaseCreated' => 'success',
             'releaseDeleted' => 'danger',
             'releaseUpdated' => 'info',
+            'removedGameBadge' => 'danger',
             'reorderedScreenshots' => 'info',
             'resetAllLeaderboardEntries' => 'danger',
+            'restoredGameBadge' => 'success',
             'setScreenshotAsPrimary' => 'info',
             'unlinkedHash' => 'danger',
             'unpublishedScreenshot' => 'warning',

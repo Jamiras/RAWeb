@@ -75,7 +75,7 @@ class EventSchema extends Schema
     public function filters(): array
     {
         return [
-            WhereIdIn::make($this),
+            WhereIdIn::make($this)->delimiter(','),
         ];
     }
 
@@ -95,6 +95,7 @@ class EventSchema extends Schema
     public function indexQuery(?object $model, Builder $query): Builder
     {
         return $query
+            ->visibleTo(request()->user())
             ->join('games', 'events.legacy_game_id', '=', 'games.id')
             ->select('events.*')
             ->addSelect('games.title as title')
