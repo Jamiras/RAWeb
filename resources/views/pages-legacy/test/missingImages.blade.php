@@ -1,32 +1,52 @@
 <?php
 
+use App\Models\Game;
 use App\Models\System;
 
 authenticateFromCookie($user, $permissions, $userDetails);
 
-$consoleList = System::get(['ID', 'Name'])->keyBy('ID')->map(fn ($system) => $system['Name']);
 $consoleID = requestInputSanitized('c', 0, 'integer');
 $filterID = requestInputSanitized('f', 0, 'integer');
 
-$filter = match($filterID)
-{
-    0 => "(image_icon_asset_path = '/Images/000001.png' ||
-           image_title_asset_path = '/Images/000002.png' ||
-           image_ingame_asset_path = '/Images/000002.png' ||
-           image_box_art_asset_path = '/Images/000002.png')",
-    1 => "achievements_published = 0",
-};
-
-$query = "SELECT g.id as ID, g.title as Title, g.system_id as ConsoleID,
-                 g.image_icon_asset_path as ImageIcon, s.name as ConsoleName, g.genre as Genre
-          FROM games g LEFT JOIN systems s ON s.id=g.system_id WHERE $filter";
-if ($consoleID > 0) {
-    $query .= " AND g.system_id = $consoleID";
-} else {
-    $query .= " AND g.system_id < 100";
+// only show active consoles
+$query = System::query();
+if ($consoleID !== -1) {
+    $query->where('active', 1);
 }
-$query .= " ORDER BY RAND() LIMIT 10";
-$gamesList = legacyDbFetchAll($query)->sortBy('Title');
+$consoleList = $query
+    ->orderBy('name')
+    ->get(['ID', 'Name'])
+    ->keyBy('ID')
+    ->map(fn ($system) => $system['Name']);
+
+$query = Game::query()->with('system');
+
+switch ($filterID)
+{
+    case 0:
+        $query->where(function($query2) {
+            $query2->where('image_icon_asset_path', '/Images/000001.png')
+                ->orWhere('image_title_asset_path', '/Images/000002.png')
+                ->orWhere('image_ingame_asset_path', '/Images/000002.png')
+                ->orWhere('image_box_art_asset_path', '/Images/000002.png');
+        });
+        break;
+
+    case 1:
+        $query->where('achievements_published', 0);
+        break;
+}
+
+if ($consoleID > 0) {
+    $query->where('system_id', $consoleID);
+} else {
+    $query->where('system_id', '<', 100);
+    if ($consoleID === 0) {
+        $query->whereRelation('system', 'active', 1);
+    }
+}
+
+$gamesList = $query->inRandomOrder()->limit(10)->get()->sortBy('sort_title');
 
 $title = match($filterID)
 {
@@ -48,19 +68,21 @@ $title = match($filterID)
             <div class='flex items-center gap-x-2'>
                 <p>Show:</p>
                 <select class='w-full sm:w-auto' onchange='window.location = "/test/missingImages.php?f={{ $filterID }}&c=" + this.options[this.selectedIndex].value'>
-                    @if ($consoleID == 0)
-                        <option value='0' selected>All consoles</option>
+                    @if ($consoleID === 0)
+                        <option value='0' selected>Active consoles</option>
                     @else
-                        <option value='0'>All consoles</option>
+                        <option value='0'>Active consoles</option>
+                    @endif
+                    @if ($consoleID === -1)
+                        <option value='-1' selected>All consoles</option>
+                    @else
+                        <option value='-1'>All consoles</option>
                     @endif
                     @foreach ($consoleList as $nextConsoleID => $nextConsoleName)
-                        <!-- 0 is "All Consoles". Don't show consoles that haven't been rolled out yet. -->
-                        @if ($nextConsoleID == 0 || isValidConsoleId($nextConsoleID))
-                            @if ($nextConsoleID == $consoleID)
-                                <option value='{{ $nextConsoleID }}' selected>{{ $nextConsoleName }}</option>
-                            @else
-                                <option value='{{ $nextConsoleID }}'>{{ $nextConsoleName }}</option>
-                            @endif
+                        @if ($nextConsoleID == $consoleID)
+                            <option value='{{ $nextConsoleID }}' selected>{{ $nextConsoleName }}</option>
+                        @else
+                            <option value='{{ $nextConsoleID }}'>{{ $nextConsoleName }}</option>
                         @endif
                     @endforeach
                 </select>
@@ -96,16 +118,16 @@ $title = match($filterID)
                         :consoleName="$consoleName"
                     />
                 ', [
-                    'gameId' => $gameEntry['ID'],
-                    'gameTitle' => $gameEntry['Title'],
-                    'gameImageIcon' => $gameEntry['ImageIcon'],
-                    'consoleName' => $gameEntry['ConsoleName'],
+                    'gameId' => $gameEntry->id,
+                    'gameTitle' => $gameEntry->title,
+                    'gameImageIcon' => $gameEntry->image_icon_asset_path,
+                    'consoleName' => $gameEntry->system->name,
                 ]);
 
                 echo str_replace('http://localhost:64000/', 'https://retroachievements.org/', $content);
             @endphp
             </td>
-            <td>{{ $gameEntry['Genre'] }}</td>
+            <td>{{ $gameEntry->genre }}</td>
             </tr>
         @endforeach
         </table>
