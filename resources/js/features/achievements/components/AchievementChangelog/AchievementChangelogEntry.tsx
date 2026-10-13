@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LuArrowRight, LuInfo } from 'react-icons/lu';
+import { LuArrowRight, LuCode, LuInfo } from 'react-icons/lu';
 
 import {
   BaseTooltip,
@@ -10,6 +10,8 @@ import {
 } from '@/common/components/+vendor/BaseTooltip';
 import { UserAvatar } from '@/common/components/UserAvatar';
 import { useFormatDate } from '@/common/hooks/useFormatDate';
+import { usePageProps } from '@/common/hooks/usePageProps';
+import { buildAchievementLogicHref } from '@/common/utils/buildAchievementLogicHref';
 import { cn } from '@/common/utils/cn';
 
 import { FIELD_LEVEL_TRACKING_CUTOFF } from '../../utils/fieldLevelTrackingCutoff';
@@ -23,15 +25,17 @@ export const AchievementChangelogEntry: FC<AchievementChangelogEntryProps> = ({
   entry,
   isCreatedAsPromoted,
 }) => {
+  const { achievement, can } = usePageProps<App.Platform.Data.AchievementShowPageProps>();
   const { t } = useTranslation();
   const { formatDate } = useFormatDate();
 
   const header = buildHeader(entry, t);
+  const logicHref = buildLogicHref(entry, achievement?.id, can?.viewAchievementLogic);
 
   return (
     <li className="group relative flex gap-3 pb-6 last:pb-0" data-testid="changelog-entry">
       {/* The last entry has no successor, so there's no reason to draw a connector. */}
-      <div className="absolute -bottom-1 left-[3px] top-3 w-px bg-neutral-700 group-last:hidden" />
+      <div className="absolute top-3 -bottom-1 left-0.75 w-px bg-neutral-700 group-last:hidden" />
 
       <div
         data-testid="changelog-dot"
@@ -45,6 +49,25 @@ export const AchievementChangelogEntry: FC<AchievementChangelogEntryProps> = ({
         <p className="flex items-center gap-1 text-xs">
           {header}
 
+          {logicHref ? (
+            <BaseTooltip>
+              <BaseTooltipTrigger asChild>
+                <a
+                  href={logicHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('View logic')}
+                >
+                  <LuCode className="size-3.5 text-link transition hover:text-link-hover" />
+                </a>
+              </BaseTooltipTrigger>
+
+              <BaseTooltipContent>
+                <span className="text-xs">{t('View logic')}</span>
+              </BaseTooltipContent>
+            </BaseTooltip>
+          ) : null}
+
           {entry.count > 1 && entry.type === 'edited' ? (
             <span className="text-neutral-400">
               {t('({{count}} times)', { count: entry.count })}
@@ -57,7 +80,7 @@ export const AchievementChangelogEntry: FC<AchievementChangelogEntryProps> = ({
                 <LuInfo className="size-3.5 text-neutral-500 transition hover:text-neutral-300 light:text-neutral-700" />
               </BaseTooltipTrigger>
 
-              <BaseTooltipContent className="max-w-72 font-normal leading-normal">
+              <BaseTooltipContent className="max-w-72 leading-normal font-normal">
                 <span className="text-xs">
                   {t('Detailed change tracking was not available before April 2022.')}
                 </span>
@@ -97,9 +120,9 @@ const FieldChangeDiff: FC<FieldChangeDiffProps> = ({ change, type }) => {
   if (type === 'badge-updated') {
     return (
       <div className="flex items-center gap-2">
-        <img src={change.oldValue!} alt="Old badge" className="size-12 rounded" />
+        <img src={change.oldValue!} alt="Old badge" className="size-12 rounded-sm" />
         <LuArrowRight className="text-neutral-500" />
-        <img src={change.newValue!} alt="New badge" className="size-12 rounded" />
+        <img src={change.newValue!} alt="New badge" className="size-12 rounded-sm" />
       </div>
     );
   }
@@ -107,19 +130,36 @@ const FieldChangeDiff: FC<FieldChangeDiffProps> = ({ change, type }) => {
   return (
     <div className="flex flex-col gap-0.5 text-2xs">
       {change.oldValue ? (
-        <span className="rounded bg-red-950/40 px-1 py-px text-red-400 line-through light:bg-red-100 light:text-red-700">
+        <span className="rounded-sm bg-red-950/40 px-1 py-px text-red-400 line-through light:bg-red-100 light:text-red-700">
           {change.oldValue}
         </span>
       ) : null}
 
       {change.newValue ? (
-        <span className="rounded bg-green-950/40 px-1 py-px text-green-400 light:bg-green-100 light:text-green-700">
+        <span className="rounded-sm bg-green-950/40 px-1 py-px text-green-400 light:bg-green-100 light:text-green-700">
           {change.newValue}
         </span>
       ) : null}
     </div>
   );
 };
+
+function buildLogicHref(
+  entry: App.Platform.Data.AchievementChangelogEntry,
+  achievementId: number | undefined,
+  canViewAchievementLogic: boolean | undefined,
+): string | null {
+  if (
+    entry.type !== 'logic-updated' ||
+    !entry.triggerVersion ||
+    !canViewAchievementLogic ||
+    !achievementId
+  ) {
+    return null;
+  }
+
+  return buildAchievementLogicHref(achievementId, entry.triggerVersion);
+}
 
 function getDotColor(type: EntryType, isCreatedAsPromoted?: boolean): string {
   switch (type) {

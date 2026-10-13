@@ -61,6 +61,23 @@ class SystemSchema extends Schema
     }
 
     /**
+     * Which attributes can be null in a response.
+     *
+     * @return array<string, bool>
+     */
+    public function attributeNullability(): array
+    {
+        return [
+            'name' => false,
+            'nameFull' => false,
+            'nameShort' => false,
+            'manufacturer' => true,
+            'iconUrl' => false,
+            'active' => false,
+        ];
+    }
+
+    /**
      * Get the resource filters.
      */
     public function filters(): array
@@ -89,7 +106,6 @@ class SystemSchema extends Schema
      */
     public function indexQuery(?object $model, Builder $query): Builder
     {
-        return $query->where('id', '!=', System::Hubs)
-            ->where('id', '!=', System::Events);
+        return $query->gameSystems();
     }
 }

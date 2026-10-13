@@ -39,7 +39,7 @@ export const GameAchievementSet: FC<GameAchievementSetProps> = ({
   achievements,
   gameAchievementSet,
 }) => {
-  const { allLeaderboards, auth, isViewingPublishedAchievements, numLeaderboards } =
+  const { allLeaderboards, auth, isViewingPublishedAchievements, numLeaderboards, activeEventAchievements } =
     usePageProps<App.Platform.Data.GameShowPageProps>();
   const { t } = useTranslation();
 
@@ -112,7 +112,7 @@ export const GameAchievementSet: FC<GameAchievementSetProps> = ({
     <div className="flex flex-col gap-2.5">
       <div
         className={cn(
-          'flex w-full flex-col gap-2 rounded bg-embed p-2 light:bg-white',
+          'flex w-full flex-col gap-2 rounded-sm bg-embed p-2 light:bg-white',
           'light:border light:border-neutral-200',
         )}
       >
@@ -178,6 +178,7 @@ export const GameAchievementSet: FC<GameAchievementSetProps> = ({
                               shouldShowAuthor={!isViewingPublishedAchievements}
                               shouldShowWeightedPoints={isViewingPublishedAchievements}
                               playersTotal={gameAchievementSet.achievementSet.playersTotal}
+                              activeEventAchievements={activeEventAchievements}
                             />
                           ))}
                         </AchievementGroupSection>
@@ -201,6 +202,7 @@ export const GameAchievementSet: FC<GameAchievementSetProps> = ({
                             isLargeList={isLargeAchievementsList}
                             shouldShowAuthor={!isViewingPublishedAchievements}
                             playersTotal={gameAchievementSet.achievementSet.playersTotal}
+                            activeEventAchievements={activeEventAchievements}
                           />
                         ))}
                       </AchievementGroupSection>
@@ -227,6 +229,7 @@ export const GameAchievementSet: FC<GameAchievementSetProps> = ({
                         shouldShowAuthor={!isViewingPublishedAchievements}
                         shouldShowWeightedPoints={isViewingPublishedAchievements}
                         playersTotal={gameAchievementSet.achievementSet.playersTotal}
+                        activeEventAchievements={activeEventAchievements}
                       />
                     ))}
 

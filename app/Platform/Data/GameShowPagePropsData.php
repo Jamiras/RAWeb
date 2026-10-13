@@ -60,7 +60,7 @@ class GameShowPagePropsData extends Data
         #[AutoInertiaDeferred]
         public Lazy|Collection $allLeaderboards,
         public int $numBeaten,
-        public int $numBeatenSoftcore,
+        public int $numBeatenCasual,
         public int $numComments,
         public int $numCompatibleHashes,
         public int $numCompletions,
@@ -95,6 +95,9 @@ class GameShowPagePropsData extends Data
         /** @var Collection<int, UserGameAchievementSetPreferenceData> */
         #[LiteralTypeScriptType('Record<number, App.Platform.Data.UserGameAchievementSetPreference>')]
         public Collection $userGameAchievementSetPreferences,
+
+        /** @var ActiveEventAchievementData[] */
+        public Lazy|array $activeEventAchievements = [],
 
         /** @var array<string, ScreenshotUploadTypeStatusData> */
         public Lazy|array $screenshotUploadStatuses = [],

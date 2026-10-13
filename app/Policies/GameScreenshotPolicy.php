@@ -46,15 +46,17 @@ class GameScreenshotPolicy
             return false;
         }
 
-        if (!$user->hasRole(Role::ROOT) && !config('feature.game_screenshot_uploads')) {
-            return false;
-        }
-
-        if (!$user->hasRole(Role::ROOT) && !$user->enable_beta_features) {
+        // retired games (~Z~ prefix) shouldn't accept new screenshots
+        if (str_starts_with($game->title, '~Z~')) {
             return false;
         }
 
         if ($game->is_media_restricted) {
+            return false;
+        }
+
+        $maxPendingSubmissions = (int) config('screenshots.max_pending_submissions_per_user');
+        if ($maxPendingSubmissions <= 0) {
             return false;
         }
 

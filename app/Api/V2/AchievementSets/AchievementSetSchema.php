@@ -10,12 +10,13 @@ use LaravelJsonApi\Eloquent\Contracts\Paginator;
 use LaravelJsonApi\Eloquent\Fields\ArrayList;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
 use LaravelJsonApi\Eloquent\Fields\ID;
-use LaravelJsonApi\Eloquent\Fields\Number;
 use LaravelJsonApi\Eloquent\Fields\Relations\BelongsToMany;
+use LaravelJsonApi\Eloquent\Fields\Relations\HasMany;
 use LaravelJsonApi\Eloquent\Fields\Str;
 use LaravelJsonApi\Eloquent\Filters\WhereIdIn;
 use LaravelJsonApi\Eloquent\Pagination\PagePagination;
 use LaravelJsonApi\Eloquent\Schema;
+use LaravelJsonApi\OpenApiSpec\Eloquent\Fields\Integer;
 
 class AchievementSetSchema extends Schema
 {
@@ -48,11 +49,16 @@ class AchievementSetSchema extends Schema
 
             Str::make('title')->readOnly(),
 
-            Number::make('pointsTotal', 'points_total')->readOnly(),
-            Number::make('pointsWeighted', 'points_weighted')->readOnly(),
+            Integer::make('pointsTotal', 'points_total')->readOnly(),
+            Integer::make('pointsWeighted', 'points_weighted')->readOnly(),
 
-            Number::make('achievementsPublished', 'achievements_published')->readOnly(),
-            Number::make('achievementsUnpublished', 'achievements_unpublished')->readOnly(),
+            Integer::make('achievementsPublished', 'achievements_published')->readOnly(),
+            Integer::make('achievementsUnpublished', 'achievements_unpublished')->readOnly(),
+
+            Integer::make('timesCompleted', 'times_completed')->readOnly(),
+            Integer::make('timesMastered', 'times_completed_hardcore')->readOnly(),
+            Integer::make('medianTimeToCompleteSeconds', 'median_time_to_complete')->readOnly(),
+            Integer::make('medianTimeToMasterSeconds', 'median_time_to_complete_hardcore')->readOnly(),
 
             Str::make('badgeUrl')->readOnly(),
 
@@ -65,8 +71,35 @@ class AchievementSetSchema extends Schema
 
             BelongsToMany::make('games', 'linkedGames')->type('games')->readOnly(),
 
+            HasMany::make('achievementSetVersions', 'versions')->type('achievement-set-versions')->cannotEagerLoad()->readOnly(),
+
             // TODO implement relationship endpoints to enable links
             // - /achievement-sets/{id}/games
+        ];
+    }
+
+    /**
+     * Which attributes can be null in a response.
+     *
+     * @return array<string, bool>
+     */
+    public function attributeNullability(): array
+    {
+        return [
+            'title' => true,
+            'pointsTotal' => false,
+            'pointsWeighted' => false,
+            'achievementsPublished' => false,
+            'achievementsUnpublished' => false,
+            'timesCompleted' => false,
+            'timesMastered' => false,
+            'medianTimeToCompleteSeconds' => true,
+            'medianTimeToMasterSeconds' => true,
+            'badgeUrl' => false,
+            'achievementsFirstPublishedAt' => true,
+            'types' => false,
+            'createdAt' => true,
+            'updatedAt' => true,
         ];
     }
 

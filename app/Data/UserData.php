@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Data;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Platform\Enums\PlayerPreferredMode;
+use App\Support\Media\UserAvatarUrl;
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Lazy;
@@ -35,6 +37,7 @@ class UserData extends Data
         public Lazy|bool $isGone = false,
         public Lazy|bool $isMuted = false,
         public Lazy|bool $isNew = false,
+        public Lazy|bool $isTeamAccount = false,
         public Lazy|bool|null $isUserWallActive = null,
         public Lazy|Carbon|null $lastActivityAt = null,
         public Lazy|int|null $legacyPermissions = null,
@@ -65,7 +68,7 @@ class UserData extends Data
     {
         return new self(
             displayName: $topic['AuthorDisplayName'] ?? $topic['Author'],
-            avatarUrl: media_asset('UserPic/' . $topic['Author'] . '.png'),
+            avatarUrl: UserAvatarUrl::fromRecord($topic['Author'], $topic),
             id: Lazy::create(fn () => (int) $topic['author_id']),
             username: Lazy::create(fn () => $topic['Author']),
         );
@@ -93,6 +96,7 @@ class UserData extends Data
             isGone: Lazy::create(fn () => $user->is_gone),
             isMuted: Lazy::create(fn () => $user->isMuted()),
             isNew: Lazy::create(fn () => $user->isNew()),
+            isTeamAccount: Lazy::create(fn () => $user->hasRole(Role::TEAM_ACCOUNT)),
             isUserWallActive: Lazy::create(fn () => $user->is_user_wall_active),
             lastActivityAt: Lazy::create(fn () => $user->last_activity_at),
             legacyPermissions: Lazy::create(fn () => (int) $user->getAttribute('Permissions')),

@@ -31,9 +31,44 @@ abstract class Alert
     }
 
     /**
+     * The username to use for the Discord webhook.
+     * If null, the webhook will use whatever is configured on Discord.
+     */
+    public static function webhookUsername(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The avatar to use for the Discord webhook.
+     * If null, the webhook will use whatever is configured on Discord.
+     */
+    public static function webhookAvatarUrl(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Build the Discord message content.
      */
     abstract public function toDiscordMessage(): string;
+
+    /**
+     * A single emoji identifying this alert kind, so a busy feed can be
+     * scanned by kind at a glance. Return null to send no prefix.
+     */
+    public function emoji(): ?string
+    {
+        return null;
+    }
+
+    public function toWebhookContent(): string
+    {
+        $emoji = $this->emoji();
+        $message = $this->toDiscordMessage();
+
+        return $emoji ? sprintf('%s · %s', $emoji, $message) : $message;
+    }
 
     public function send(): bool
     {
@@ -42,7 +77,10 @@ abstract class Alert
             return false;
         }
 
-        dispatch(new SendAlertWebhookJob($this, $webhookUrl))
+        $webhookUsername = static::webhookUsername();
+        $webhookAvatarUrl = static::webhookAvatarUrl();
+
+        dispatch(new SendAlertWebhookJob($this, $webhookUrl, $webhookUsername, $webhookAvatarUrl))
             ->onQueue('alerts');
 
         return true;

@@ -2,6 +2,7 @@
 
 // TODO migrate to ForumController::show()
 
+use App\Community\Actions\GetMaskedForumAuthorIdsAction;
 use App\Enums\Permissions;
 use App\Models\Forum;
 use App\Models\User;
@@ -51,7 +52,14 @@ if ($requestedForumID == 0 && $permissions >= Permissions::Moderator) {
     $thisCategoryID = $forum->category->id;
     $thisCategoryName = $forum->category->title;
 
-    $topicList = getForumTopics($requestedForumID, $offset, $count, $permissions, $numTotalTopics);
+    $topicList = getForumTopics(
+        $requestedForumID,
+        $offset,
+        $count,
+        $permissions,
+        $numTotalTopics,
+        maskedAuthorIds: (new GetMaskedForumAuthorIdsAction())->execute($userModel),
+    );
 
     $requestedForum = $thisForumTitle;
 }
@@ -74,7 +82,7 @@ sanitize_outputs(
     echo "</div>";
 
     if ($numUnofficialLinks > 0) {
-        echo "<div class='my-3 bg-embedded p-2 rounded-sm'>";
+        echo "<div class='my-3 bg-embedded p-2 rounded-xs'>";
         echo "<b>Administrator Notice:</b> <a href='/viewforum.php?f=0'>$numUnofficialLinks unverified posts need authorising: please verify them!</a>";
         echo "</div>";
     }

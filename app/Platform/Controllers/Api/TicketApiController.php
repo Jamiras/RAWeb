@@ -5,15 +5,30 @@ namespace App\Platform\Controllers\Api;
 use App\Community\Enums\TicketState;
 use App\Http\Controller;
 use App\Models\Ticket;
+use App\Models\User;
+use App\Platform\Actions\BuildTicketListAction;
 use App\Platform\Actions\CreateTicketAction;
 use App\Platform\Data\StoreTicketData;
 use App\Platform\Requests\StoreTicketRequest;
+use App\Platform\Requests\TicketListApiRequest;
 use Illuminate\Http\JsonResponse;
 
 class TicketApiController extends Controller
 {
-    public function index(): void
+    public function index(TicketListApiRequest $request): JsonResponse
     {
+        $scope = $request->getScope();
+        $target = $scope->resolveTarget($request);
+
+        $this->authorize('viewAny', [Ticket::class, $target instanceof User ? $target : null]);
+
+        $result = (new BuildTicketListAction())->execute($scope, $target, $request);
+
+        return response()->json([
+            'paginatedTickets' => $result['paginatedTickets'],
+            'stateCounts' => $result['stateCounts'],
+            'facetCounts' => $result['facetCounts'],
+        ]);
     }
 
     public function store(

@@ -110,7 +110,7 @@ function getUsersSiteAwards(?User $user, bool $applyBadgePreferences = false): a
                 AND saw.user_id = :userId4
         UNION
         -- non-game awards (developer contribution, ...)
-        SELECT " . unixTimestampStatement('MAX(saw.awarded_at)', 'AwardedAt') . ", saw.award_type, saw.user_id, MAX( saw.award_key ), saw.award_tier, saw.order_column, NULL, NULL, NULL, NULL, NULL, NULL
+        SELECT " . unixTimestampStatement('MAX(saw.awarded_at)', 'AwardedAt') . ", saw.award_type, saw.user_id, MAX( saw.award_key ), saw.award_tier, saw.order_column, NULL, NULL, NULL, NULL, NULL, MAX( saw.display_award_tier )
             FROM user_awards AS saw
             WHERE
                 saw.award_type NOT IN('{$gameAwardValues}','" . AwardType::Event->value . "','" . AwardType::Playtest->value . "')
@@ -147,16 +147,40 @@ function HasPatreonBadge(User $user): bool
         ->exists();
 }
 
-function SetPatreonSupporter(User $user, bool $enable): void
+function GetPatreonSupporterTier(User $user): int
 {
-    if ($enable) {
-        $badge = AddSiteAward($user, AwardType::PatreonSupporter, 0, 0);
-        SiteBadgeAwarded::dispatch($badge);
-        // TODO PatreonSupporterAdded::dispatch($user);
-    } else {
+    $badge = $user->playerBadges()
+        ->where('award_type', AwardType::PatreonSupporter)
+        ->first();
+
+    return $badge ? (int) $badge->award_tier : 0;
+}
+
+function SetPatreonSupporter(User $user, int $tier): void
+{
+    if ($tier <= 0) {
         $user->playerBadges()->where('award_type', AwardType::PatreonSupporter)->delete();
-        // TODO PatreonSupporterRemoved::dispatch($user);
+
+        return;
     }
+
+    $existing = $user->playerBadges()
+        ->where('award_type', AwardType::PatreonSupporter)
+        ->first();
+
+    if ($existing) {
+        if ((int) $existing->award_tier !== $tier) {
+            $existing->award_tier = $tier;
+            $existing->save();
+        }
+
+        SiteBadgeAwarded::dispatch($existing);
+
+        return;
+    }
+
+    $badge = AddSiteAward($user, AwardType::PatreonSupporter, 0, $tier);
+    SiteBadgeAwarded::dispatch($badge);
 }
 
 function HasCertifiedLegendBadge(User $user): bool
@@ -268,8 +292,7 @@ function getUserEventAwardCount(User $user): int
 
 /**
  * Retrieves a target user's site award metadata for a given game ID.
- * An array is returned with keys "beaten-softcore", "beaten-hardcore",
- * "completed", and "mastered", which contain corresponding award details.
+ * An array is returned with legacy award-kind keys containing corresponding award details.
  * If no progression awards are found, or if the target username is not provided,
  * no awards are fetched or returned.
  *
@@ -294,9 +317,9 @@ function getUserGameProgressionAwards(int $gameId, User $user): array
 
         $key = '';
         if ($awardType === AwardType::Mastery) {
-            $key = $awardExtra == UnlockMode::Softcore ? 'completed' : 'mastered';
+            $key = $awardExtra == UnlockMode::Casual ? 'completed' : 'mastered';
         } elseif ($awardType === AwardType::GameBeaten) {
-            $key = $awardExtra == UnlockMode::Softcore ? 'beaten-softcore' : 'beaten-hardcore';
+            $key = $awardExtra == UnlockMode::Casual ? 'beaten-softcore' : 'beaten-hardcore';
         }
 
         if ($key && is_null($userGameProgressionAwards[$key])) {

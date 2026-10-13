@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Platform\Enums\UnlockMode;
+use Illuminate\Support\Facades\Gate;
 
 authenticateFromCookie($user, $permissions, $userDetails);
 
@@ -15,12 +16,14 @@ if (!$userDetails) {
     abort(404);
 }
 
+Gate::authorize('view', $userDetails);
+
 $userPage = $userDetails->display_name;
 
 $dateInput = (int) request()->input('d', 0);
 
 $userPageHardcorePoints = $userDetails->points_hardcore;
-$userPageSoftcorePoints = $userDetails->points;
+$userPageCasualPoints = $userDetails->points;
 
 $achEarnedOnDay = getAchievementsEarnedOnDay($dateInput, $userDetails);
 
@@ -51,8 +54,8 @@ $dateStr = strftime("%d %b %Y", $dateInput);
     if ($userPageHardcorePoints > 0) {
         echo "($userPageHardcorePoints) ";
     }
-    if ($userPageSoftcorePoints > 0) {
-        echo "<span class='softcore'>($userPageSoftcorePoints softcore)</span>";
+    if ($userPageCasualPoints > 0) {
+        echo "<span class='casual'>($userPageCasualPoints casual)</span>";
     }
 
     echo "</b><br>";
@@ -97,7 +100,7 @@ $dateStr = strftime("%d %b %Y", $dateInput);
             $achEarnedLib[$achID]['PointsNote'] = "$achPoints";
         } elseif (!isset($achEarnedLib[$achID])) {
             $achEarnedLib[$achID] = $achEarned;
-            $achEarnedLib[$achID]['PointsNote'] = "<span class='softcore'>$achPoints</span>";
+            $achEarnedLib[$achID]['PointsNote'] = "<span class='casual'>$achPoints</span>";
         }
     }
 

@@ -27,7 +27,7 @@ const Terms: AppPage = () => {
           */}
           <div className="sr-only absolute top-4" id="conditions" />
 
-          <div className="rounded bg-embed p-4">
+          <div className="rounded-sm bg-embed p-4">
             <div className="flex flex-col gap-y-6">
               <div>
                 <h2 className="text-h4">{t('Terms and Conditions')}</h2>
@@ -63,11 +63,27 @@ const Terms: AppPage = () => {
                     }}
                   />
                 </p>
+                <p>
+                  {t(
+                    'We may suspend or terminate accounts for serious or repeated breaches of our Code of Conduct.',
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="mb-0 border-b-0 text-lg font-medium">
+                  {t('Limitation of liability')}
+                </h3>
+                <p>
+                  {t(
+                    'We are not liable for business losses or losses that neither you nor we could reasonably have foreseen when you agreed to these terms. These exclusions do not apply to fraud, death, or personal injury caused by our negligence, or liability that the law does not allow us to limit.',
+                  )}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded bg-embed p-4">
+          <div className="rounded-sm bg-embed p-4">
             <div className="flex flex-col gap-y-6">
               <div>
                 <h2 className="text-h4">{t('Disclaimers')}</h2>
@@ -98,7 +114,7 @@ const Terms: AppPage = () => {
             </div>
           </div>
 
-          <div className="rounded bg-embed p-4">
+          <div className="rounded-sm bg-embed p-4">
             <div className="flex flex-col gap-y-6">
               <div>
                 <h2 className="text-h4">{t('Copyright')}</h2>
@@ -125,7 +141,7 @@ const Terms: AppPage = () => {
             </div>
           </div>
 
-          <div className="rounded bg-embed p-4">
+          <div className="rounded-sm bg-embed p-4">
             <div className="flex flex-col gap-y-6">
               <div>
                 <h2 className="text-h4" id="privacy-policy">

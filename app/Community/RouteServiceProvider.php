@@ -10,6 +10,7 @@ use App\Community\Controllers\AchievementSetClaimController;
 use App\Community\Controllers\Api\AchievementCommentApiController;
 use App\Community\Controllers\Api\ActivePlayersApiController;
 use App\Community\Controllers\Api\BetaFeedbackApiController;
+use App\Community\Controllers\Api\ConnectedOAuthApplicationApiController;
 use App\Community\Controllers\Api\ForumTopicApiController;
 use App\Community\Controllers\Api\ForumTopicCommentApiController;
 use App\Community\Controllers\Api\GameClaimsCommentApiController;
@@ -19,6 +20,7 @@ use App\Community\Controllers\Api\GameModificationsCommentApiController;
 use App\Community\Controllers\Api\LeaderboardCommentApiController;
 use App\Community\Controllers\Api\MessageApiController;
 use App\Community\Controllers\Api\MessageThreadApiController;
+use App\Community\Controllers\Api\OAuthApplicationApiController;
 use App\Community\Controllers\Api\ShortcodeApiController;
 use App\Community\Controllers\Api\SubscriptionApiController;
 use App\Community\Controllers\Api\UnsubscribeApiController;
@@ -46,13 +48,18 @@ use App\Community\Controllers\UserGameListController;
 use App\Community\Controllers\UserSetRequestListController;
 use App\Community\Controllers\UserSettingsController;
 use App\Platform\Controllers\GameController;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
 class RouteServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        $this->configureRateLimiting();
+
         /*
          * sanitize route model binding patterns
          */
@@ -144,7 +151,7 @@ class RouteServiceProvider extends ServiceProvider
                         Route::get('messages/{user}', [MessageThreadController::class, 'index'])->name('message-thread.user.index');
                         Route::get('messages/{user}/create', [MessageThreadController::class, 'create'])->name('message-thread.user.create');
 
-                        Route::get('settings', [UserSettingsController::class, 'show'])->name('settings.show');
+                        Route::get('settings', [UserSettingsController::class, 'show'])->name('settings');
                     });
                 });
 
@@ -378,6 +385,7 @@ class RouteServiceProvider extends ServiceProvider
                 ], function () {
                     Route::post('game/{game}/claim/create', [AchievementSetClaimController::class, 'store'])->name('achievement-set-claim.create');
                     Route::post('game/{game}/claim/drop', [AchievementSetClaimController::class, 'delete'])->name('achievement-set-claim.delete');
+                    Route::post('claim/{claim}/release-scheduled', [AchievementSetClaimController::class, 'markReleaseScheduled'])->name('achievement-set-claim.release-scheduled');
                     Route::post('claim/{claim}/update', [AchievementSetClaimController::class, 'update'])->name('achievement-set-claim.update');
                 });
 
@@ -399,9 +407,19 @@ class RouteServiceProvider extends ServiceProvider
 
                     Route::post('username-change-request', [UserSettingsController::class, 'storeUsernameChangeRequest'])
                         ->name('api.settings.name-change-request.store');
+                    Route::post('username-change-request/check', [UserSettingsController::class, 'checkUsernameChangeRequest'])
+                        ->name('api.settings.name-change-request.check');
 
                     Route::delete('keys/web', [UserSettingsController::class, 'resetWebApiKey'])->name('api.settings.keys.web.destroy');
                     Route::delete('keys/connect', [UserSettingsController::class, 'resetConnectApiKey'])->name('api.settings.keys.connect.destroy');
+
+                    Route::middleware('throttle:oauth-applications')->group(function () {
+                        Route::post('applications', [OAuthApplicationApiController::class, 'store'])->name('api.settings.applications.store');
+                        Route::put('applications/{client}', [OAuthApplicationApiController::class, 'update'])->name('api.settings.applications.update');
+                        Route::post('applications/{client}/regenerate-secret', [OAuthApplicationApiController::class, 'regenerateSecret'])->name('api.settings.applications.regenerate-secret');
+                        Route::delete('applications/{client}', [OAuthApplicationApiController::class, 'destroy'])->name('api.settings.applications.destroy');
+                        Route::delete('connected-applications/{client}', [ConnectedOAuthApplicationApiController::class, 'destroy'])->name('api.settings.connected-applications.destroy');
+                    });
                 });
 
                 /*
@@ -412,5 +430,10 @@ class RouteServiceProvider extends ServiceProvider
                     Route::post('unsubscribe/undo/{token}', [UnsubscribeApiController::class, 'undo'])->name('api.unsubscribe.undo');
                 });
             });
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('oauth-applications', fn (Request $request) => Limit::perMinute(20)->by((string) $request->user()?->getAuthIdentifier()));
     }
 }

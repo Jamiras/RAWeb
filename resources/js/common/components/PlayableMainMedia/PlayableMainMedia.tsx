@@ -80,7 +80,7 @@ export const PlayableMainMedia: FC<PlayableMainMediaProps> = ({
   };
 
   const imgProps = {
-    className: 'h-full w-full rounded-sm object-contain',
+    className: 'h-full w-full rounded-xs object-contain',
     style: isPixelated ? { imageRendering: 'pixelated' as const } : undefined,
   };
 
@@ -90,7 +90,7 @@ export const PlayableMainMedia: FC<PlayableMainMediaProps> = ({
         'grid w-full grid-cols-2 items-start justify-items-center',
         'border border-embed-highlight bg-zinc-900/50 light:bg-neutral-50',
         'gap-x-5 gap-y-1',
-        'xl:mx-0 xl:min-h-[180px] xl:w-full xl:rounded-lg xl:px-4 xl:py-2',
+        'xl:mx-0 xl:w-full xl:rounded-lg xl:px-4 xl:py-2',
       )}
     >
       {hasGallery ? (
@@ -124,7 +124,7 @@ export const PlayableMainMedia: FC<PlayableMainMediaProps> = ({
               <span
                 className={cn(
                   'absolute bottom-1.5 right-1.5 flex items-center gap-1',
-                  'rounded bg-black/80 px-1.5 py-0.5 text-2xs text-white/90',
+                  'rounded-sm bg-black/80 px-1.5 py-0.5 text-2xs text-white/90',
                 )}
               >
                 <LuCamera className="size-3" />
@@ -152,6 +152,7 @@ export const PlayableMainMedia: FC<PlayableMainMediaProps> = ({
             alt={t('title screenshot')}
             aspectRatio={aspectRatio}
             isPixelated={isPixelated}
+            srcWidth={imageTitleDimensions?.width}
           >
             <div
               className="flex w-full items-center justify-center overflow-hidden"
@@ -166,6 +167,7 @@ export const PlayableMainMedia: FC<PlayableMainMediaProps> = ({
             alt={t('ingame screenshot')}
             aspectRatio={aspectRatio}
             isPixelated={isPixelated}
+            srcWidth={imageIngameDimensions?.width}
           >
             <div
               className="flex w-full items-center justify-center overflow-hidden"

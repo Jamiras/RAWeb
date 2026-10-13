@@ -4,6 +4,9 @@
     Expected variables from the parent view:
     - $triggers: Collection of Trigger models with version history.
     - $lazyLoad: bool - Whether to load data asynchronously (true for complex achievements).
+    - $focusedVersion: int|null - Version to expand on load, from a changelog deep link.
+    - $shouldShowAllVersions: bool - Whether the older versions hidden behind "See N more" must be shown for $focusedVersion to be reachable.
+    - $visibleVersionCount: int - How many versions render before the rest collapse behind "See N more". Owned by the page so this partial and the page cannot drift apart.
     - $summaries: array<int, string> - Pre-computed summaries (only when $lazyLoad is false).
     - $diffs: array<int, array> - Pre-computed diffs (only when $lazyLoad is false).
 
@@ -26,7 +29,8 @@
         x-data="{
             expanded: {},
             viewMode: {},
-            showAll: false,
+            showAll: {{ ($shouldShowAllVersions ?? false) ? 'true' : 'false' }},
+            focusedVersion: @js($focusedVersion ?? null),
             lazyLoad: {{ ($lazyLoad ?? false) ? 'true' : 'false' }},
             summaries: @js($summaries ?? []),
             diffs: @js($diffs ?? []),
@@ -36,6 +40,12 @@
                 if (this.lazyLoad) {
                     this.summaries = await $wire.loadAllSummaries();
                     this.loadingSummaries = false;
+                }
+
+                // Expand through toggleVersion rather than seeding `expanded` directly,
+                // so a lazy-loaded version still fetches its diff.
+                if (this.focusedVersion !== null) {
+                    await this.toggleVersion(this.focusedVersion);
                 }
             },
             async toggleVersion(version) {
@@ -69,18 +79,18 @@
         @foreach ($triggers as $trigger)
             <div
                 class="border-b border-neutral-200 dark:border-neutral-700 py-3 last:border-0"
-                x-show="showAll || {{ $loop->index }} < 8"
+                x-show="showAll || {{ $loop->index }} < {{ $visibleVersionCount }}"
             >
                 {{-- Version header --}}
                 <button
                     @click="toggleVersion({{ $trigger->version ?? "'draft'" }})"
-                    class="w-full text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/50 -mx-2 px-2 py-1.5 rounded transition-colors"
+                    class="w-full text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/50 -mx-2 px-2 py-1.5 rounded-sm transition-colors"
                 >
                     <div class="flex items-center justify-between gap-4">
                         {{-- Avatar + author + time --}}
                         <div class="flex items-center gap-2 text-sm">
                             @if ($trigger->user)
-                                <x-filament-panels::avatar.user :user="$trigger->user" class="!size-5" />
+                                <x-filament-panels::avatar.user :user="$trigger->user" class="size-5!" />
                             @endif
 
                             <span class="text-neutral-950 dark:text-white font-medium">{{ $trigger->user?->display_name ?? 'Unknown' }}</span>
@@ -109,12 +119,12 @@
                             @endif
 
                             @if ($trigger->version)
-                                <span class="font-mono text-xs px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                <span class="font-mono text-xs px-2 py-0.5 rounded-sm bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
                                     v{{ $trigger->version }}
                                 </span>
                             @else
                                 <span
-                                    class="font-mono text-xs px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-help"
+                                    class="font-mono text-xs px-2 py-0.5 rounded-sm bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-help"
                                     x-tooltip="{ content: 'This asset is unpublished', theme: $store.theme }"
                                 >
                                     Draft
@@ -148,7 +158,7 @@
                                 :class="(viewMode[{{ $trigger->version ?? "'draft'" }}] ?? 'diff') === 'diff'
                                     ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100'
                                     : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'"
-                                class="px-3 py-1 text-xs font-medium rounded transition-colors"
+                                class="px-3 py-1 text-xs font-medium rounded-sm transition-colors"
                             >
                                 Diff
                             </button>
@@ -158,7 +168,7 @@
                                 :class="viewMode[{{ $trigger->version ?? "'draft'" }}] === 'raw'
                                     ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100'
                                     : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'"
-                                class="px-3 py-1 text-xs font-medium rounded transition-colors"
+                                class="px-3 py-1 text-xs font-medium rounded-sm transition-colors"
                             >
                                 Raw
                             </button>
@@ -296,7 +306,7 @@
 
                         {{-- Raw view, shown when user selects the 'Raw' toggle button/tab --}}
                         <div x-show="viewMode[{{ $trigger->version ?? "'draft'" }}] === 'raw'" x-cloak>
-                            <code class="block p-3 font-mono text-[11px] rounded-lg bg-gray-950/[0.02] dark:bg-white/[0.02] border border-gray-950/5 dark:border-white/10 break-all text-neutral-600 dark:text-neutral-400">
+                            <code class="block p-3 font-mono text-[11px] rounded-lg bg-gray-950/2 dark:bg-white/2 border border-gray-950/5 dark:border-white/10 break-all text-neutral-600 dark:text-neutral-400">
                                 {{ $trigger->conditions }}
                             </code>
                         </div>
@@ -305,13 +315,17 @@
             </div>
         @endforeach
 
-        @if ($triggers->count() > 8)
+        @if ($triggers->count() > $visibleVersionCount)
+            @php
+                $hiddenVersionCount = $triggers->count() - $visibleVersionCount;
+            @endphp
+
             <button
                 x-show="!showAll"
                 @click="showAll = true"
                 class="w-full py-3 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
             >
-                See {{ $triggers->count() - 8 }} more {{ Str::plural('version', $triggers->count() - 8) }}...
+                See {{ $hiddenVersionCount }} more {{ Str::plural('version', $hiddenVersionCount) }}...
             </button>
         @endif
     </div>

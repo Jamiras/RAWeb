@@ -6,6 +6,8 @@ import { route } from 'ziggy-js';
 import { useCardTooltip } from '../../../hooks/useCardTooltip';
 import { persistedTicketsAtom } from '../../../state/shortcode.atoms';
 import { cn } from '../../../utils/cn';
+import { getIsTicketStateFinished } from '../../../utils/getIsTicketStateFinished';
+import { getIsTicketStateOpen } from '../../../utils/getIsTicketStateOpen';
 
 interface ShortcodeTicketProps {
   ticketId: number;
@@ -24,6 +26,8 @@ export const ShortcodeTicket: FC<ShortcodeTicketProps> = ({ ticketId }) => {
     return null;
   }
 
+  const stateClassName = getTicketStateClassName(foundTicket.state!);
+
   if (
     foundTicket.ticketableType === 'achievement' &&
     foundTicket.ticketable &&
@@ -34,7 +38,7 @@ export const ShortcodeTicket: FC<ShortcodeTicketProps> = ({ ticketId }) => {
         data-testid="achievement-ticket-embed"
         href={route('ticket.show', { ticket: ticketId })}
         {...cardTooltipProps}
-        className={cn('inline-block rounded', getTicketStateClassName(foundTicket.state))}
+        className={cn('inline-block rounded-sm', stateClassName)}
       >
         <img
           loading="lazy"
@@ -43,7 +47,7 @@ export const ShortcodeTicket: FC<ShortcodeTicketProps> = ({ ticketId }) => {
           height={28}
           src={foundTicket.ticketable.badgeUnlockedUrl}
           alt={'ticket'}
-          className="rounded-sm border-2 border-transparent"
+          className="rounded-xs border-2 border-transparent"
         />
 
         <span className="px-1">{t('Ticket #{{ticketId}}', { ticketId })}</span>
@@ -51,16 +55,28 @@ export const ShortcodeTicket: FC<ShortcodeTicketProps> = ({ ticketId }) => {
     );
   }
 
-  // Other ticketable types aren't supported yet.
+  if (foundTicket.ticketableType === 'leaderboard') {
+    return (
+      <a
+        data-testid="leaderboard-ticket-embed"
+        href={route('ticket.show', { ticket: ticketId })}
+        {...cardTooltipProps}
+        className={cn('inline-block rounded px-1.5 py-0.5', stateClassName)}
+      >
+        {t('Ticket #{{ticketId}}', { ticketId })}
+      </a>
+    );
+  }
+
   return null;
 };
 
-function getTicketStateClassName(ticketState: App.Community.Enums.TicketState | undefined): string {
-  if (ticketState === 'open' || ticketState === 'request') {
+function getTicketStateClassName(ticketState: App.Community.Enums.TicketState): string {
+  if (getIsTicketStateOpen(ticketState)) {
     return 'border border-green-600';
   }
 
-  if (ticketState === 'closed' || ticketState === 'resolved') {
+  if (getIsTicketStateFinished(ticketState)) {
     return 'border border-red-600';
   }
 

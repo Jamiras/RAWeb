@@ -12,7 +12,6 @@ use App\Platform\Enums\GameScreenshotStatus;
 use App\Platform\Enums\ScreenshotReviewDecision;
 use App\Platform\Enums\ScreenshotType;
 use Closure;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 final class ScreenshotReviewContext
@@ -51,6 +50,32 @@ final class ScreenshotReviewContext
     public function system(): ?System
     {
         return $this->game()?->system;
+    }
+
+    public function isPixelated(): bool
+    {
+        return !($this->system()?->supports_upscaled_screenshots ?? true);
+    }
+
+    public function imageRenderingFor(?GameScreenshot $screenshot): ?string
+    {
+        if (!$screenshot) {
+            return null;
+        }
+
+        if ($this->isPixelated()) {
+            return 'pixelated';
+        }
+
+        if (!$screenshot->width || $screenshot->width <= 0) {
+            return null;
+        }
+
+        if ($screenshot->width <= 640) {
+            return 'crisp-edges';
+        }
+
+        return null;
     }
 
     /**
@@ -354,7 +379,106 @@ final class ScreenshotReviewContext
     }
 
     /**
-     * @return array<int, array{typeLabel: string, resolution: string, url: string|null, invalid: bool}>
+     * @return Collection<int, GameScreenshot>
+     */
+    public function otherPendingForGame(): Collection
+    {
+        return $this->remember('otherPendingForGame', fn (): Collection => $this->gameScreenshots()
+            ->filter(fn (GameScreenshot $screenshot): bool => $screenshot->status === GameScreenshotStatus::Pending
+                && $screenshot->id !== $this->screenshot->id
+            )
+            ->sortBy([
+                fn (GameScreenshot $a, GameScreenshot $b): int => $a->type->sortOrder() <=> $b->type->sortOrder(),
+                ['created_at', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values()
+        );
+    }
+
+    /**
+     * @return Collection<int, GameScreenshot>
+     */
+    public function allPendingForGame(): Collection
+    {
+        return $this->remember('allPendingForGame', fn (): Collection => $this->gameScreenshots()
+            ->filter(fn (GameScreenshot $screenshot): bool => $screenshot->status === GameScreenshotStatus::Pending)
+            ->sortBy([
+                fn (GameScreenshot $a, GameScreenshot $b): int => $a->type->sortOrder() <=> $b->type->sortOrder(),
+                ['created_at', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values()
+        );
+    }
+
+    /**
+     * @return array{items: array<int, array{recordKey: string, typeLabel: string, resolution: string, submitterLabel: string, url: string|null, isCurrent: bool}>}|null
+     */
+    public function allPendingForGameContextData(): ?array
+    {
+        if ($this->otherPendingForGame()->isEmpty()) {
+            return null;
+        }
+
+        $submissions = $this->allPendingForGame();
+
+        return [
+            'items' => $submissions
+                ->map(fn (GameScreenshot $submission): array => [
+                    'recordKey' => (string) $submission->getKey(),
+                    'typeLabel' => $submission->type->label(),
+                    'resolution' => $this->formatResolution($submission) ?? '?',
+                    'submitterLabel' => $submission->capturedBy?->display_name ?? 'Unknown user',
+                    'url' => $submission->media?->getUrl(),
+                    'isCurrent' => $submission->id === $this->screenshot->id,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return Collection<int, GameScreenshot>
+     */
+    public function approvedGalleryScreenshots(): Collection
+    {
+        return $this->remember('approvedGalleryScreenshots', fn (): Collection => $this->approvedScreenshotsForType(ScreenshotType::Ingame)
+            ->filter(fn (GameScreenshot $screenshot): bool => $screenshot->width !== null && $screenshot->height !== null)
+            ->sortBy([
+                ['order_column', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values()
+        );
+    }
+
+    /**
+     * @return array<int, array{url: string|null, resolution: string, label: string, typeLabel: string, submitterLabel: string, imageRendering: string|null}>
+     */
+    public function approvedGalleryItemsViewData(): array
+    {
+        return $this->approvedGalleryScreenshots()
+            ->map(function (GameScreenshot $screenshot): array {
+                $screenshot->loadMissing(['capturedBy', 'media']);
+
+                $resolution = $this->formatResolution($screenshot) ?? '?';
+
+                return [
+                    'url' => $screenshot->media?->getUrl(),
+                    'resolution' => $resolution,
+                    'label' => "Gallery image ({$resolution})",
+                    'typeLabel' => $screenshot->type->label(),
+                    'submitterLabel' => $screenshot->capturedBy?->display_name ?? 'Unknown user',
+                    'imageRendering' => $this->imageRenderingFor($screenshot),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{typeLabel: string, resolution: string, label: string, url: string|null, invalid: bool, imageRendering: string|null}>
      */
     public function currentPrimaryContextItems(): array
     {
@@ -370,50 +494,20 @@ final class ScreenshotReviewContext
                 }
 
                 $primary->loadMissing('media');
+                $resolution = $this->formatResolution($primary) ?? '?';
 
                 return [
                     'typeLabel' => $type->label(),
-                    'resolution' => $this->formatResolution($primary) ?? '?',
+                    'resolution' => $resolution,
+                    'label' => "{$type->label()} primary ({$resolution})",
                     'url' => $primary->media?->getUrl(),
                     'invalid' => $this->hasInvalidResolution($primary),
+                    'imageRendering' => $this->imageRenderingFor($primary),
                 ];
             })
             ->filter()
             ->values()
             ->all();
-    }
-
-    /**
-     * @return array{items: array<int, array{recordKey: string, typeLabel: string, resolution: string, submitterLabel: string, url: string|null}>, extraCount: int}|null
-     */
-    public function pendingCompanionsContextData(): ?array
-    {
-        /** @var EloquentCollection<int, GameScreenshot> $companions */
-        $companions = new EloquentCollection($this->matchingPendingCompanions()->all());
-        $companions->loadMissing(['capturedBy', 'media']);
-
-        $companions = $companions
-            ->sortBy(fn (GameScreenshot $screenshot): int => $screenshot->type->sortOrder())
-            ->values();
-
-        if ($companions->isEmpty()) {
-            return null;
-        }
-
-        return [
-            'items' => $companions
-                ->take(3)
-                ->map(fn (GameScreenshot $companion): array => [
-                    'recordKey' => (string) $companion->getKey(),
-                    'typeLabel' => $companion->type->label(),
-                    'resolution' => $this->formatResolution($companion) ?? '?',
-                    'submitterLabel' => $companion->capturedBy?->display_name ?? 'Unknown user',
-                    'url' => $companion->media?->getUrl(),
-                ])
-                ->values()
-                ->all(),
-            'extraCount' => max(0, $companions->count() - 3),
-        ];
     }
 
     public function canFixCurrentPrimary(): bool

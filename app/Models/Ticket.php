@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Community\Enums\TicketResolution;
 use App\Community\Enums\TicketState;
 use App\Community\Enums\TicketType;
 use App\Platform\Enums\LeaderboardState;
@@ -39,12 +40,25 @@ class Ticket extends BaseModel
     protected $casts = [
         'type' => TicketType::class,
         'state' => TicketState::class,
+        'resolution' => TicketResolution::class,
         'resolved_at' => 'datetime',
     ];
 
     protected static function newFactory(): TicketFactory
     {
         return TicketFactory::new();
+    }
+
+    // == helpers
+
+    public function getTicketableModel(): Achievement|Leaderboard
+    {
+        $ticketable = $this->ticketable;
+        if ($ticketable instanceof Achievement || $ticketable instanceof Leaderboard) {
+            return $ticketable;
+        }
+
+        throw new LogicException("Ticket {$this->id} has no resolvable ticketable (type: {$this->ticketable_type}).");
     }
 
     // == accessors
@@ -68,7 +82,7 @@ class Ticket extends BaseModel
 
     /**
      * Unsafe without a `ticketable_type = achievement` filter.
-     * Use `ticketable()` or pair with `scopeForTicketableType`.
+     * Use `getTicketableModel()`, `ticketable()`, or pair with `scopeForTicketableType`.
      *
      * @return BelongsTo<Achievement, $this>
      */
@@ -79,7 +93,7 @@ class Ticket extends BaseModel
 
     /**
      * Unsafe without a `ticketable_type = leaderboard` filter.
-     * Use `ticketable()` or pair with `scopeForTicketableType`.
+     * Use `getTicketableModel()`, `ticketable()`, or pair with `scopeForTicketableType`.
      *
      * @return BelongsTo<Leaderboard, $this>
      */
@@ -128,6 +142,14 @@ class Ticket extends BaseModel
         return $this->belongsTo(GameHash::class, 'game_hash_id', 'id');
     }
 
+    /**
+     * @return BelongsTo<Trigger, $this>
+     */
+    public function trigger(): BelongsTo
+    {
+        return $this->belongsTo(Trigger::class, 'trigger_id', 'id')->withTrashed();
+    }
+
     // == scopes
 
     /**
@@ -155,18 +177,34 @@ class Ticket extends BaseModel
      * @param Builder<Ticket> $query
      * @return Builder<Ticket>
      */
-    public function scopeResolved(Builder $query): Builder
+    public function scopeQuarantined(Builder $query): Builder
     {
-        return $query->whereIn('state', [TicketState::Resolved, TicketState::Closed]);
+        return $query->where('state', TicketState::Quarantined);
+    }
+
+    /**
+     * Excludes tickets whose ticketable was deleted.
+     *
+     * @param Builder<Ticket> $query
+     * @return Builder<Ticket>
+     */
+    public function scopeWithLiveTicketable(Builder $query): Builder
+    {
+        return $query->whereHasMorph('ticketable', [Achievement::class, Leaderboard::class]);
     }
 
     /**
      * @param Builder<Ticket> $query
      * @return Builder<Ticket>
      */
-    public function scopeQuarantined(Builder $query): Builder
+    public function scopeVisibleTo(Builder $query, ?User $user = null): Builder
     {
-        return $query->where('state', TicketState::Quarantined);
+        // Guests can't see tickets.
+        if ($user === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     /**
@@ -179,6 +217,19 @@ class Ticket extends BaseModel
             'ticketable',
             [Achievement::class, Leaderboard::class],
             fn (Builder $q) => $q->where('game_id', $game->id),
+        );
+    }
+
+    /**
+     * @param Builder<Ticket> $query
+     * @return Builder<Ticket>
+     */
+    public function scopeForSystem(Builder $query, int $systemId): Builder
+    {
+        return $query->whereHasMorph(
+            'ticketable',
+            [Achievement::class, Leaderboard::class],
+            fn (Builder $q) => $q->whereHas('game', fn (Builder $game) => $game->where('system_id', $systemId)),
         );
     }
 

@@ -12,17 +12,21 @@ use App\Community\Enums\SubscriptionSubjectType;
 use App\Community\Enums\UserGameListType;
 use App\Community\Services\SubscriptionService;
 use App\Data\UserPermissionsData;
+use App\Models\Achievement;
+use App\Models\Event;
+use App\Models\EventAchievement;
 use App\Models\Game;
 use App\Models\GameAchievementSet;
 use App\Models\GameScreenshot;
 use App\Models\GameSet;
+use App\Models\PlayerAchievement;
 use App\Models\PlayerGame;
 use App\Models\Role;
-use App\Models\Ticket;
 use App\Models\User;
 use App\Models\UserGameAchievementSetPreference;
 use App\Models\UserGameListEntry;
 use App\Platform\Data\AchievementSetClaimData;
+use App\Platform\Data\ActiveEventAchievementData;
 use App\Platform\Data\GameAchievementSetData;
 use App\Platform\Data\GameData;
 use App\Platform\Data\GameScreenshotData;
@@ -41,6 +45,7 @@ use App\Platform\Enums\GamePageListSort;
 use App\Platform\Enums\GamePageListView;
 use App\Platform\Enums\GameScreenshotStatus;
 use App\Platform\Services\GameLeaderboardService;
+use App\Platform\Services\GameOpenTicketCountService;
 use App\Platform\Services\ScreenshotResolutionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cookie;
@@ -57,6 +62,7 @@ class BuildGameShowPagePropsAction
         protected BuildHubBreadcrumbsAction $buildHubBreadcrumbsAction,
         protected BuildSeriesHubDataAction $buildSeriesHubDataAction,
         protected GameLeaderboardService $gameLeaderboardService,
+        protected GameOpenTicketCountService $gameOpenTicketCountService,
         protected LoadGameRecentPlayersAction $loadGameRecentPlayersAction,
         protected LoadGameTopAchieversAction $loadGameTopAchieversAction,
         protected ProcessGameReleasesForViewAction $processGameReleasesForViewAction,
@@ -105,7 +111,7 @@ class BuildGameShowPagePropsAction
             $backingGame = $game;
         }
 
-        [$numMasters, $topAchievers, $numCompletions, $numBeaten, $numBeatenSoftcore] =
+        [$numMasters, $topAchievers, $numCompletions, $numBeaten, $numBeatenCasual] =
             $this->loadGameTopAchieversAction->execute($backingGame);
 
         $playerGame = $user
@@ -349,13 +355,13 @@ class BuildGameShowPagePropsAction
             numCompatibleHashes: $this->getCompatibleHashesCount($game, $targetAchievementSet),
             numCompletions: $numCompletions,
             numBeaten: $numBeaten,
-            numBeatenSoftcore: $numBeatenSoftcore,
+            numBeatenCasual: $numBeatenCasual,
             numInterestedDevelopers: $this->getInterestedDevelopersCount($backingGame, $user),
             numLeaderboards: $this->gameLeaderboardService->getCount($backingGame, $isPromoted),
             numMasters: $numMasters,
-            numOpenTickets: $isPromoted
-                ? Ticket::forGame($backingGame)->open()->promoted()->count()
-                : Ticket::forGame($backingGame)->open()->unpromoted()->count(),
+            numOpenTickets: $this->gameOpenTicketCountService->count($backingGame, $isPromoted),
+
+            activeEventAchievements: $this->buildActiveEventAchievements($game, $user),
 
             numScreenshots: $game->gameScreenshots()->approved()->count(),
             screenshots: Lazy::inertiaDeferred(fn () => $game->gameScreenshots()
@@ -460,7 +466,7 @@ class BuildGameShowPagePropsAction
     private function buildAchievementSetClaims(Game $game, ?User $user): Collection
     {
         // Privileged roles can see when a claimant last played the game.
-        $claimIncludes = ['user', 'claimType', 'finishedAt', 'status'];
+        $claimIncludes = ['user', 'claimType', 'finishedAt', 'status', 'canMarkReleaseScheduled'];
         if ($user && $user->hasAnyRole([Role::DEV_COMPLIANCE, Role::MODERATOR, Role::ADMINISTRATOR])) {
             $claimIncludes[] = 'userLastPlayedAt';
         }
@@ -673,5 +679,48 @@ class BuildGameShowPagePropsAction
         }
 
         return $statuses;
+    }
+
+    private function buildActiveEventAchievements(Game $game, ?User $user): array
+    {
+        $shouldShowEvergreen = $user?->prefers_evergreen_event_indicators ?? false;
+
+        $activeEventAchievements = EventAchievement::active()
+            ->with('event.legacyGame')
+            ->whereIn('source_achievement_id', $game->achievements->pluck('id'))
+            ->when(!$shouldShowEvergreen, fn ($query) => $query->whereNotNull('active_until'))
+            ->orderBy('source_achievement_id')
+            ->orderBy('active_until')
+            ->get()
+            ->filter(function (EventAchievement $eventAchievement) use ($user) {
+                if (!$user) {
+                    return !$eventAchievement->event->active_from?->isFuture();
+                }
+
+                return $user->can('view', $eventAchievement->event);
+            })
+            ->values();
+
+        if ($activeEventAchievements->isEmpty()) {
+            return [];
+        }
+
+        if ($user) {
+            $unlocks = PlayerAchievement::query()
+                ->where('user_id', $user->id)
+                ->whereIn('achievement_id', $activeEventAchievements->pluck('achievement_id'))
+                ->whereNotNull('unlocked_hardcore_at')
+                ->pluck('achievement_id')
+                ->flip();
+        } else {
+            $unlocks = collect();
+        }
+
+        return $activeEventAchievements->map(
+            fn (EventAchievement $eventAchievement) => ActiveEventAchievementData::fromEventAchievement(
+                $eventAchievement,
+                $unlocks->has($eventAchievement->achievement_id),
+            )
+        )->all();
     }
 }

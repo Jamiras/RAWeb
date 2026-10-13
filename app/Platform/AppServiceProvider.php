@@ -32,6 +32,8 @@ use App\Platform\Commands\BackfillGameBadgesCurrentCanonicalCommand;
 use App\Platform\Commands\BackfillGameBadgesFromAuditLogCommand;
 use App\Platform\Commands\BackfillGameBadgesFromCommentsCommand;
 use App\Platform\Commands\BackfillGameBadgesFromForumCommentsCommand;
+use App\Platform\Commands\BackfillMissingPlayerGames;
+use App\Platform\Commands\BackfillReplacedGameScreenshotAttributionCommand;
 use App\Platform\Commands\CheckDeveloperInactivity;
 use App\Platform\Commands\CheckForAchievementSetChanges;
 use App\Platform\Commands\ConvertGameToEvent;
@@ -40,6 +42,7 @@ use App\Platform\Commands\CreateAchievementOfTheWeek;
 use App\Platform\Commands\DeleteStalePlayerPointsStatsEntries;
 use App\Platform\Commands\FixUnversionedPromotedTriggers;
 use App\Platform\Commands\NoIntroImport;
+use App\Platform\Commands\NormalizeTextWhitespace;
 use App\Platform\Commands\ProcessExpiringClaims;
 use App\Platform\Commands\PruneDuplicateSubsetNotes;
 use App\Platform\Commands\PruneGameRecentPlayers;
@@ -67,6 +70,7 @@ use App\Platform\Commands\UpdateMinimumEmulatorVersions;
 use App\Platform\Commands\UpdatePlayerBeatenGamesStats;
 use App\Platform\Commands\UpdatePlayerEstimatedTimes;
 use App\Platform\Commands\UpdatePlayerGameMetrics;
+use App\Platform\Commands\UpdatePlayerGlobalRankings;
 use App\Platform\Commands\UpdatePlayerMetrics;
 use App\Platform\Commands\UpdatePlayerPointsStats;
 use App\Platform\Commands\UpdateSearchIndexForQueuedEntities;
@@ -93,8 +97,10 @@ class AppServiceProvider extends ServiceProvider
                 RecalculateAchievementWeightedPoints::class,
 
                 // Games
+                BackfillMissingPlayerGames::class,
                 CheckForAchievementSetChanges::class,
                 ConvertGameToEvent::class,
+                NormalizeTextWhitespace::class,
                 PruneDuplicateSubsetNotes::class,
                 PruneGameRecentPlayers::class,
                 RegenerateGameScreenshotConversions::class,
@@ -120,6 +126,9 @@ class AppServiceProvider extends ServiceProvider
                 // Game Hashes
                 NoIntroImport::class,
 
+                // Game Screenshots
+                BackfillReplacedGameScreenshotAttributionCommand::class,
+
                 // Leaderboards
                 UpdateLeaderboardMetrics::class,
 
@@ -130,6 +139,7 @@ class AppServiceProvider extends ServiceProvider
                 UnlockPlayerAchievement::class,
                 UpdatePlayerEstimatedTimes::class,
                 UpdatePlayerGameMetrics::class,
+                UpdatePlayerGlobalRankings::class,
                 UpdatePlayerMetrics::class,
 
                 // Player Stats
@@ -170,6 +180,7 @@ class AppServiceProvider extends ServiceProvider
             $schedule = $this->app->make(Schedule::class);
 
             $schedule->command(UpdateBeatenGamesLeaderboard::class)->everyFiveMinutes();
+            $schedule->command(UpdatePlayerGlobalRankings::class)->everyFifteenMinutes();
 
             $schedule->command(UpdatePlayerPointsStats::class, ['--existing-only'])->hourly();
             $schedule->command(UpdateSearchIndexForQueuedEntities::class)->hourly();

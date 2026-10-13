@@ -6,7 +6,7 @@ interface Variables {
   payload: {
     ticketableModel: 'achievement' | 'leaderboard';
     ticketableId: number;
-    mode: 'hardcore' | 'softcore';
+    mode: 'hardcore' | 'casual';
     issue: App.Community.Enums.TicketType;
     description: string;
     emulator: string;
@@ -21,6 +21,6 @@ interface Variables {
 export function useCreateTicketMutation() {
   return useMutation({
     mutationFn: ({ payload }: Variables) =>
-      axios.post<{ message: string; ticketId: string }>(route('api.ticket.store'), payload),
+      axios.post<{ message: string; ticketId: number }>(route('api.ticket.store'), payload),
   });
 }

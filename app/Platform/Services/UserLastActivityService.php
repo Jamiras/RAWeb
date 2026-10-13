@@ -15,12 +15,13 @@ class UserLastActivityService
     private const CACHE_PREFIX = 'user-activity:';
     private const PENDING_SET_KEY = 'user-activity-flush:pending-set';
     private const CACHE_TTL_HOURS = 24;
+    private const CHUNK_SIZE = 500;
 
     /**
      * Record user activity timestamps.
      *
      * When the Redis cache driver is enabled, timestamps are cached
-     * and then batch-flushed to the DB. This helps us mitigate lock
+     * and then batch-flushed to the DB. This helps us mitigate
      * contention issues on the users table.
      *
      * When Redis isn't being used (eg: tests), timestamps are instead
@@ -54,12 +55,9 @@ class UserLastActivityService
      */
     public function getLastActivity(int $userId): ?Carbon
     {
-        // Check the cache first.
-        if (config('cache.default') === 'redis') {
-            $timestamp = Cache::get(self::CACHE_PREFIX . $userId);
-            if ($timestamp !== null) {
-                return Carbon::createFromTimestamp((int) $timestamp);
-            }
+        $cached = $this->getCachedLastActivity($userId);
+        if ($cached !== null) {
+            return $cached;
         }
 
         // Otherwise, fall back to the DB.
@@ -67,6 +65,23 @@ class UserLastActivityService
         $dbValue = DB::table('users')->where('id', $userId)->value('last_activity_at');
 
         return $dbValue !== null ? Carbon::parse($dbValue) : null;
+    }
+
+    /**
+     * Get the last activity timestamp for a user from the cache only.
+     * The cache can hold fresher timestamps than the users table because
+     * writes are batch-flushed. Callers that already hold the loaded column
+     * value use this to skip the per-user DB fallback.
+     */
+    public function getCachedLastActivity(int $userId): ?Carbon
+    {
+        if (config('cache.default') !== 'redis') {
+            return null;
+        }
+
+        $timestamp = Cache::get(self::CACHE_PREFIX . $userId);
+
+        return $timestamp !== null ? Carbon::createFromTimestamp((int) $timestamp) : null;
     }
 
     /**
@@ -123,11 +138,15 @@ class UserLastActivityService
             return 0;
         }
 
+        ksort($activities);
+
         // Write in chunks to avoid overly-massive queries.
-        $chunks = array_chunk($activities, 500, preserve_keys: true);
+        $chunks = array_chunk($activities, self::CHUNK_SIZE, preserve_keys: true);
 
         foreach ($chunks as $chunk) {
-            $this->bulkUpdateChunk($chunk);
+            DB::transaction(function () use ($chunk): void {
+                $this->bulkUpdateChunk($chunk);
+            }, attempts: 3);
         }
 
         return count($activities);

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Community\Enums\TicketAction;
+use App\Community\Enums\TicketState;
+use App\Exceptions\BannedUserException;
 use App\Models\Achievement;
 use App\Models\Leaderboard;
 use App\Models\Role;
@@ -26,11 +29,20 @@ class TicketPolicy
         ]);
     }
 
-    public function viewAny(?User $user): bool
+    public function viewAny(?User $user, ?User $ticketsOwner = null): bool
     {
         // Guests cannot view tickets.
         if (!$user) {
             return false;
+        }
+
+        // Banned account subpages are hidden from the public. Tickets are the
+        // exception, and only for people whose job it is to clean them up.
+        if (
+            $ticketsOwner?->isBanned()
+            && !$user->hasAnyRole([Role::DEVELOPER, Role::MODERATOR, Role::ADMINISTRATOR])
+        ) {
+            throw new BannedUserException();
         }
 
         return true;
@@ -65,12 +77,29 @@ class TicketPolicy
 
     public function create(User $user): bool
     {
-        return
-            $user->hasVerifiedEmail()
-            && $user->created_at->diffInHours(Carbon::now(), true) >= 24
-            && !$user->is_muted
-            && !$user->banned_at
-        ;
+        if (!$user->hasVerifiedEmail()) {
+            return false;
+        }
+
+        if ($user->created_at->diffInHours(Carbon::now(), true) < 24) {
+            return false;
+        }
+
+        if ($user->is_muted || $user->banned_at) {
+            return false;
+        }
+
+        // Untracked users are already generally known to have an unlock history
+        // that is untrustworthy. Team members are exempt, as they already have an
+        // elevated level of trust.
+        if (
+            $user->unranked_at !== null
+            && $user->roles->whereNotIn('name', Role::nonTeamRoles())->isEmpty()
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     // TODO `Model $triggerable` and check for `HasVersionedTrigger`
@@ -120,11 +149,34 @@ class TicketPolicy
         return $user->hasPlayedGame($leaderboard->game);
     }
 
-    public function updateState(User $user): bool
+    public function updateState(User $user, Ticket $ticket, TicketAction $action): bool
     {
-        return $user->hasAnyRole([
-            Role::DEVELOPER,
-            Role::TICKET_MANAGER,
-        ]);
+        // An update must actually change the ticket state.
+        if ($action->targetState() === $ticket->state) {
+            return false;
+        }
+
+        // Tickets cannot be reassigned to deleted users.
+        if ($action === TicketAction::Request && (!$ticket->reporter || $ticket->reporter->trashed())) {
+            return false;
+        }
+
+        if ($user->hasAnyRole([Role::DEVELOPER, Role::MODERATOR, Role::ADMINISTRATOR])) {
+            return true;
+        }
+
+        if ($user->id !== $ticket->reporter_id) {
+            return false;
+        }
+
+        return match ($action) {
+            TicketAction::ClosedMistaken => in_array(
+                $ticket->state,
+                [TicketState::Open, TicketState::Request, TicketState::Quarantined],
+                true,
+            ),
+            TicketAction::Reopen => $ticket->state === TicketState::Request,
+            default => false,
+        };
     }
 }

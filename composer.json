@@ -12,7 +12,6 @@
         "ext-intl": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-mysqli": "*",
         "ext-pdo": "*",
         "ext-simplexml": "*",
         "aws/aws-sdk-php": "^3.235",
@@ -43,6 +42,7 @@
         "opcodesio/log-viewer": "^3.1",
         "owenvoke/blade-fontawesome": "^3.0",
         "propaganistas/laravel-disposable-email": "^2.4",
+        "retroachievements/openapi-spec-generator": "^1.7.0",
         "sentry/sentry-laravel": "^4.13",
         "snipe/banbuilder": "dev-master",
         "socialiteproviders/discord": "^4.1",
@@ -75,11 +75,10 @@
         "barryvdh/laravel-debugbar": "^4.2.5",
         "barryvdh/laravel-ide-helper": "^3.1",
         "brianium/paratest": "^7.2",
-        "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
-        "laravel/boost": "^2.0",
         "laravel-json-api/testing": "^3.1",
+        "laravel/boost": "^2.0",
         "laravel/pail": "^1.2",
         "laravel/pint": "^1.25",
         "laravel/sail": "^1.26",
@@ -88,9 +87,7 @@
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.1",
         "predis/predis": "^2.0",
-        "rector/rector": "^2.0",
-        "spatie/laravel-ignition": "^2.9",
-        "worksome/envy": "^1.1"
+        "spatie/laravel-ignition": "^2.9"
     },
     "autoload": {
         "psr-4": {
@@ -144,7 +141,6 @@
         "mfs": "@php artisan migrate:refresh --seed",
         "octane": "@php artisan octane:start --watch --port=8888 --caddyfile=docker/octane/Caddyfile",
         "paratest": "@php artisan test --parallel",
-        "rector": "@php vendor/bin/rector process",
         "setup": [
             "@php composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
@@ -153,7 +149,7 @@
             "@php -r \"file_exists('storage/app/settings.json') || copy('storage/app/settings.dist.json', 'storage/app/settings.json');\"",
             "@php -r \"(file_exists('storage/oauth-private.key') && file_exists('storage/oauth-public.key')) ? print('Passport Keys already exist, to regenerate them run: php artisan passport:keys --force' . PHP_EOL) : passthru('php artisan passport:keys');\""
         ],
-        "stan": "@php vendor/bin/phpstan analyse --memory-limit 768M --ansi",
+        "stan": "@php vendor/bin/phpstan analyse --memory-limit 1G --ansi",
         "stan-baseline": "@php vendor/bin/phpstan analyse --generate-baseline --memory-limit 1G",
         "stan-clear": "@php vendor/bin/phpstan clear-result-cache",
         "start": "@php artisan serve --port=64000",
@@ -196,5 +192,10 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "openapi-spec-generator",
+        "type": "vcs",
+        "url": "https://github.com/RetroAchievements/openapi-spec-generator"
+    }]
 }

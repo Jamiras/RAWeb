@@ -2,6 +2,7 @@
 
 import { createAuthenticatedUser } from '@/common/models';
 import { render, screen } from '@/test';
+import { createUser } from '@/test/factories';
 
 import { AuthorizeRoot } from './AuthorizeRoot';
 
@@ -29,6 +30,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -52,18 +54,216 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
     // ASSERT
     expect(screen.getByText(/test app wants to access your account/i)).toBeVisible();
 
-    expect(screen.getByText(/this will allow test app to:/i)).toBeVisible();
-    expect(screen.getByText(/access your profile information/i)).toBeVisible();
-    expect(screen.getByText(/make api calls on your behalf/i)).toBeVisible();
+    expect(screen.getByText(/this will let it:/i)).toBeVisible();
+    expect(screen.queryByText(/this will allow test app to:/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/view publicly visible retroachievements data/i)).toBeVisible();
 
     expect(screen.getByText(/currently signed in as/i)).toBeVisible();
     expect(screen.getByText('Scott')).toBeVisible();
+  });
+
+  it('given the client has an owner, names them as the registrant', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+          owner: createUser({ displayName: 'Jamiras' }),
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['data:read'],
+      },
+    });
+
+    // ASSERT
+    expect(screen.getByText('App registered by')).toBeVisible();
+
+    const ownerLink = screen.getByRole('link', { name: 'Jamiras' });
+
+    expect(ownerLink).toBeVisible();
+    expect(ownerLink).toHaveAttribute('href', expect.stringContaining('user.show'));
+
+    expect(ownerLink).toHaveAttribute('target', '_blank');
+    expect(ownerLink).toHaveAttribute('rel', 'noopener');
+  });
+
+  it('given the client has no owner, does not crash', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+          owner: null, // !!
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['data:read'],
+      },
+    });
+
+    // ASSERT
+    expect(screen.queryByText('App registered by')).not.toBeInTheDocument();
+    expect(screen.getByText(/currently signed in as/i)).toBeVisible();
+  });
+
+  it('translates known scopes and falls back to the identifier for unknown ones', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['data:read', 'data:mystery'],
+      },
+    });
+
+    // ASSERT
+    expect(screen.getByText('View publicly visible RetroAchievements data')).toBeVisible();
+    expect(screen.getByText('data:mystery')).toBeVisible();
+  });
+
+  it('given the follows scope, renders its consent copy instead of the identifier', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['follows:read'],
+      },
+    });
+
+    // ASSERT
+    expect(
+      screen.getByText('View the people you follow and the people who follow you'),
+    ).toBeVisible();
+    expect(screen.queryByText('follows:read')).not.toBeInTheDocument();
+  });
+
+  it('given the game lists scope, renders its consent copy instead of the identifier', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['game-lists:read'],
+      },
+    });
+
+    // ASSERT
+    expect(
+      screen.getByText('View your personal game lists, such as Want to Play and Want to Develop'),
+    ).toBeVisible();
+    expect(screen.queryByText('game-lists:read')).not.toBeInTheDocument();
+  });
+
+  it('given all scopes, renders a distinct line for each', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="app" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['data:read', 'follows:read', 'game-lists:read'],
+      },
+    });
+
+    // ASSERT
+    expect(screen.getByText('View publicly visible RetroAchievements data')).toBeVisible();
+    expect(
+      screen.getByText('View the people you follow and the people who follow you'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('View your personal game lists, such as Want to Play and Want to Develop'),
+    ).toBeVisible();
+  });
+
+  it('given the device variant, renders the same scope copy as the app variant', () => {
+    // ARRANGE
+    render(<AuthorizeRoot variant="device" />, {
+      pageProps: {
+        auth: {
+          user: createAuthenticatedUser(),
+        },
+        authToken: 'test-auth-token',
+        client: {
+          id: 'client-123',
+          name: 'Test App',
+        },
+        csrfToken: 'csrf-token-123',
+        request: {
+          state: 'request-state-123',
+        },
+        scopes: ['follows:read', 'game-lists:read'],
+      },
+    });
+
+    // ASSERT
+    expect(
+      screen.getByText('View the people you follow and the people who follow you'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('View your personal game lists, such as Want to Play and Want to Develop'),
+    ).toBeVisible();
   });
 
   it('displays both deny and authorize buttons', () => {
@@ -82,6 +282,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -106,6 +307,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -133,6 +335,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -162,6 +365,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -191,6 +395,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: 'request-state-123',
         },
+        scopes: ['data:read'],
       },
     });
 
@@ -219,6 +424,7 @@ describe('Component: AuthorizeRoot', () => {
         request: {
           state: null, // !!
         },
+        scopes: ['data:read'],
       },
     });
 

@@ -25,7 +25,7 @@ export const PreferencesSectionCard: FC<PreferencesSectionCardProps> = ({
       onSubmit={onSubmit}
       isSubmitting={mutation.isPending}
     >
-      <div className="grid gap-x-36 gap-y-6 md:grid-cols-2">
+      <div className="flex flex-col gap-5">
         <PreferencesSwitchField
           t_label={t('Suppress mature content warnings')}
           fieldName={StringifiedUserPreference.Site_SuppressMatureContentWarning}
@@ -45,6 +45,15 @@ export const PreferencesSectionCard: FC<PreferencesSectionCardProps> = ({
         />
 
         <PreferencesSwitchField
+          t_label={t('Show evergreen event achievement indicators')}
+          t_infoText={t(
+            'Achievements in time-limited events are always marked on game pages. Turn this on to also mark achievements in evergreen events, which never expire.',
+          )}
+          fieldName={StringifiedUserPreference.Game_ShowEvergreenEventIndicators}
+          control={form.control}
+        />
+
+        <PreferencesSwitchField
           t_label={t('Only people I follow can message me or post on my wall')}
           fieldName={StringifiedUserPreference.User_OnlyContactFromFollowing}
           control={form.control}
@@ -59,7 +68,7 @@ export const PreferencesSectionCard: FC<PreferencesSectionCardProps> = ({
         <PreferencesSwitchField
           t_label={t('Automatically opt in to game sets')}
           t_infoText={t(
-            'Does not apply to Challenge sets. Core sets are always opted in by default.',
+            'Base sets are always included. This only affects Bonus, Challenge, Specialty, and Exclusive sets.',
           )}
           fieldName={StringifiedUserPreference.Game_OptOutOfAllSubsets}
           control={form.control}

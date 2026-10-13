@@ -8,19 +8,29 @@ use App\Api\Controllers\CatchAllController;
 use App\Api\Controllers\HealthController;
 use App\Api\Internal\Controllers\AchievementController as InternalAchievementController;
 use App\Api\Middleware\AddContentLengthHeader;
+use App\Api\Middleware\BlockBannedUserRequests;
 use App\Api\Middleware\LogApiRequest;
 use App\Api\Middleware\LogLegacyApiUsage;
+use App\Api\Middleware\RequireOAuthReadScope;
+use App\Api\Middleware\RequireOAuthTokenWithScope;
 use App\Api\Middleware\ServiceAccountOnly;
 use App\Api\V1\Controllers\WebApiV1Controller;
 use App\Api\V2\Controllers\AchievementController;
+use App\Api\V2\Controllers\AchievementOfTheWeekController;
 use App\Api\V2\Controllers\AchievementSetClaimController;
 use App\Api\V2\Controllers\AchievementSetController;
+use App\Api\V2\Controllers\AchievementSetVersionController;
+use App\Api\V2\Controllers\EventAchievementController;
 use App\Api\V2\Controllers\EventController;
+use App\Api\V2\Controllers\GameAchievementDistributionController;
 use App\Api\V2\Controllers\GameController;
 use App\Api\V2\Controllers\HubController;
 use App\Api\V2\Controllers\LeaderboardController;
 use App\Api\V2\Controllers\SystemController;
+use App\Api\V2\Controllers\TicketController;
+use App\Api\V2\Controllers\UserAwardController;
 use App\Api\V2\Controllers\UserController;
+use App\Enums\OAuthScope;
 use App\Http\Concerns\HandlesPublicFileRequests;
 use App\Models\Achievement;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -96,16 +106,25 @@ class RouteServiceProvider extends ServiceProvider
                     Route::middleware([
                         LogApiRequest::class . ':v2',
                         'auth:api-token-header,oauth',
+                        RequireOAuthReadScope::class,
                         AddContentLengthHeader::class,
                         'throttle:' . $rateLimit,
                     ])->group(function () {
                         Route::get('health', [HealthController::class, 'check'])->name('v2.health');
+
+                        Route::get('games/{gameId}/achievement-distribution', GameAchievementDistributionController::class)
+                            ->whereNumber('gameId')
+                            ->name('v2.games.achievement-distribution');
+
+                        Route::get('event-achievements/achievement-of-the-week', AchievementOfTheWeekController::class)
+                            ->name('v2.event-achievements.achievement-of-the-week');
                     });
 
                     JsonApiRoute::server('v2')
                         ->middleware(
                             LogApiRequest::class . ':v2',
                             'auth:api-token-header,oauth',
+                            RequireOAuthReadScope::class,
                             AddContentLengthHeader::class,
                             'throttle:' . $rateLimit
                         )
@@ -114,59 +133,85 @@ class RouteServiceProvider extends ServiceProvider
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
-                                    $relationships->hasMany('comments')->readOnly();
-                                    $relationships->hasMany('playerAchievements')->readOnly();
+                                    $relationships->hasMany('comments')->only('related');
+                                    $relationships->hasMany('playerAchievements')->only('related');
+                                    $relationships->hasMany('tickets')->only('related');
                                 });
 
                             $server->resource('achievement-sets', AchievementSetController::class)
                                 ->only('show')
-                                ->readOnly();
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('achievementSetVersions')->only('related');
+                                });
 
                             $server->resource('achievement-set-claims', AchievementSetClaimController::class)
                                 ->only('index');
 
-                            $server->resource('events', EventController::class)
+                            $server->resource('achievement-set-versions', AchievementSetVersionController::class)
+                                ->only('index');
+
+                            $server->resource('event-achievements', EventAchievementController::class)
                                 ->only('index', 'show')
                                 ->readOnly();
+
+                            $server->resource('events', EventController::class)
+                                ->only('index', 'show')
+                                ->readOnly()
+                                ->relationships(function ($relationships) {
+                                    $relationships->hasMany('eventAchievements')->only('related');
+                                });
 
                             $server->resource('games', GameController::class)
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
-                                    $relationships->hasMany('achievementSetClaims')->readOnly();
-                                    $relationships->hasMany('comments')->readOnly();
-                                    $relationships->hasMany('hashes')->readOnly();
+                                    $relationships->hasMany('achievementSetClaims')->only('related');
+                                    $relationships->hasMany('comments')->only('related');
+                                    $relationships->hasMany('hashes')->only('related');
+                                    $relationships->hasMany('tickets')->only('related');
                                 });
 
                             $server->resource('hubs', HubController::class)
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
-                                    $relationships->hasMany('games')->readOnly();
-                                    $relationships->hasMany('links')->readOnly();
+                                    $relationships->hasMany('games')->only('related');
+                                    $relationships->hasMany('links')->only('related');
                                 });
 
                             $server->resource('leaderboards', LeaderboardController::class)
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
-                                    $relationships->hasMany('entries')->readOnly();
+                                    $relationships->hasMany('entries')->only('related');
                                 });
 
                             $server->resource('systems', SystemController::class)
                                 ->only('index', 'show')
                                 ->readOnly();
 
+                            $server->resource('tickets', TicketController::class)
+                                ->only('index', 'show')
+                                ->readOnly();
+
+                            $server->resource('user-awards', UserAwardController::class)
+                                ->only('index');
+
                             $server->resource('users', UserController::class)
                                 ->only('index', 'show')
                                 ->readOnly()
                                 ->relationships(function ($relationships) {
-                                    $relationships->hasMany('achievementSetClaims')->readOnly();
-                                    $relationships->hasMany('awards')->readOnly();
-                                    $relationships->hasMany('playerAchievements')->readOnly();
-                                    $relationships->hasMany('playerAchievementSets')->readOnly();
-                                    $relationships->hasMany('playerGames')->readOnly();
-                                    $relationships->hasMany('wallComments')->readOnly();
+                                    $relationships->hasMany('achievementSetClaims')->only('related');
+                                    $relationships->hasMany('awards')->only('related');
+                                    $relationships->hasMany('followers')->only('related')->middleware(RequireOAuthTokenWithScope::class . ':' . OAuthScope::FollowsRead->value);
+                                    $relationships->hasMany('following')->only('related')->middleware(RequireOAuthTokenWithScope::class . ':' . OAuthScope::FollowsRead->value);
+                                    $relationships->hasMany('leaderboardEntries')->only('related');
+                                    $relationships->hasMany('playerAchievements')->only('related');
+                                    $relationships->hasMany('playerAchievementSets')->only('related');
+                                    $relationships->hasMany('playerGames')->only('related');
+                                    $relationships->hasMany('tickets')->only('related');
+                                    $relationships->hasMany('userGameListEntries')->only('related')->middleware(RequireOAuthTokenWithScope::class . ':' . OAuthScope::GameListsRead->value);
+                                    $relationships->hasMany('wallComments')->only('related');
                                 });
                         });
                 });
@@ -213,7 +258,7 @@ class RouteServiceProvider extends ServiceProvider
          * Casing should be handled by web server (API vs api).
          * Always has to be authenticated with an api token.
          */
-        Route::middleware(['api', 'auth:api-token', LogLegacyApiUsage::class])->prefix('API')->group(function () {
+        Route::middleware(['api', 'auth:api-token', LogLegacyApiUsage::class, BlockBannedUserRequests::class])->prefix('API')->group(function () {
             /**
              * Usually called via GET, should allow POST, too though
              */

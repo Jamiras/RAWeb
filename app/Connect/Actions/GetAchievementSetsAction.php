@@ -28,16 +28,17 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
 {
     protected int $gameId;
     protected ?string $gameHashMd5;
-    protected ?bool $isPromoted;
+    protected ?bool $promotedFilter;
     protected ClientSupportLevel $clientSupportLevel;
     protected ?EmulatorCoreRestriction $coreRestriction = null;
+    protected bool $withUnpromotedLeaderboards = false;
 
-    public function execute(User $user, int $gameId = 0, ?string $gameHash = null, ?bool $isPromoted = true): array
+    public function execute(User $user, int $gameId = 0, ?string $gameHash = null, ?bool $promotedFilter = true): array
     {
         $this->user = $user;
         $this->gameId = $gameId;
         $this->gameHashMd5 = $gameHash;
-        $this->isPromoted = $isPromoted;
+        $this->promotedFilter = $promotedFilter;
         $this->clientSupportLevel = ClientSupportLevel::Full;
 
         return $this->process();
@@ -53,7 +54,7 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
         $this->gameHashMd5 = request()->input('m');
 
         $flag = request()->integer('f', 0);
-        $this->isPromoted = Achievement::isPromotedFromLegacyFlags($flag);
+        $this->promotedFilter = Achievement::isPromotedFromLegacyFlags($flag);
 
         $userAgentService = new UserAgentService();
         [$this->clientSupportLevel, $this->coreRestriction] = $userAgentService->getSupportLevelAndCoreRestriction($this->userAgent);
@@ -63,6 +64,8 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
         if ($this->clientSupportLevel === ClientSupportLevel::Blocked && !$this->coreRestriction) {
             return $this->unsupportedClient();
         }
+
+        $this->withUnpromotedLeaderboards = request()->integer('v', 0) === 2;
 
         return null;
     }
@@ -92,6 +95,12 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
             $response = $this->buildPatchData($game, null);
         } else {
             return $this->gameNotFound();
+        }
+
+        // if the game hash specifies a system id, use it instead of whatever is in the game record.
+        // this primarily allows for "event game" records where the game record is associated to System::Events.
+        if ($gameHash?->system_id) {
+            $response['ConsoleId'] = $gameHash->system_id;
         }
 
         if ($this->clientSupportLevel !== ClientSupportLevel::Full && $game->achievements_published > 0) {
@@ -184,8 +193,6 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
         ?string $richPresencePatch = null,
         GameHashCompatibility $compatibility = GameHashCompatibility::Compatible,
     ): array {
-        $gamePlayerCount = $this->calculateGamePlayerCount($game);
-
         $sets = [];
         if ($resolvedSets?->isNotEmpty()) {
             // Preload all games.
@@ -195,6 +202,7 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
             foreach ($resolvedSets as $resolvedSet) {
                 $setGame = $games[$resolvedSet->core_game_id];
 
+                $gamePlayerCount = $this->calculateGamePlayerCount($setGame);
                 $achievements = $this->buildAchievementsData($resolvedSet, $gamePlayerCount);
                 $leaderboards = $this->buildLeaderboardsData($setGame);
 
@@ -214,6 +222,7 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
                 ->with('achievementSet.achievements.developer')
                 ->first();
 
+            $gamePlayerCount = $this->calculateGamePlayerCount($game);
             $achievements = $coreAchievementSet
                 ? $this->buildAchievementsData($coreAchievementSet, $gamePlayerCount)
                 : [];
@@ -264,8 +273,8 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
             ->orderBy('id')           // tiebreaker on creation sequence
             ->get();
 
-        if ($this->isPromoted !== null) {
-            $achievements = $achievements->where('is_promoted', '=', $this->isPromoted);
+        if ($this->promotedFilter !== null) {
+            $achievements = $achievements->where('is_promoted', '=', $this->promotedFilter);
         }
 
         $achievementsData = [];
@@ -311,14 +320,23 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
         $leaderboardsData = [];
 
         // TODO detach leaderboards from games
-        $leaderboards = $game->leaderboards()
-            ->where('state', LeaderboardState::Active) // only active leaderboards
+        $query = $game->leaderboards();
+
+        if ($this->promotedFilter !== null) {
+            $query->where('state', $this->promotedFilter ? LeaderboardState::Active : LeaderboardState::Unpromoted);
+        } elseif ($this->withUnpromotedLeaderboards) {
+            $query->whereIn('state', [LeaderboardState::Active, LeaderboardState::Unpromoted]);
+        } else {
+            $query->where('state', LeaderboardState::Active); // only active leaderboards by default
+        }
+
+        $leaderboards = $query
             ->orderBy('order_column') // explicit display order
             ->orderBy('id')           // tiebreaker on creation sequence
             ->get();
 
         foreach ($leaderboards as $leaderboard) {
-            $leaderboardsData[] = [
+            $leaderboardData = [
                 'ID' => $leaderboard->id,
                 'Mem' => $leaderboard->trigger_definition,
                 'Format' => $leaderboard->format,
@@ -327,6 +345,12 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
                 'Description' => $leaderboard->description,
                 'Hidden' => ($leaderboard->order_column < 0),
             ];
+
+            if ($this->withUnpromotedLeaderboards) {
+                $leaderboardData['State'] = $leaderboard->state;
+            }
+
+            $leaderboardsData[] = $leaderboardData;
         }
 
         return $leaderboardsData;
@@ -490,7 +514,7 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
                 if ($this->coreRestriction->recommendation) {
                     $description .= " {$this->coreRestriction->recommendation}";
                 }
-            } elseif ($this->clientSupportLevel === ClientSupportLevel::SoftcorePending) {
+            } elseif ($this->clientSupportLevel === ClientSupportLevel::CasualPending) {
                 $userAgentService = new UserAgentService();
                 $emulatorUserAgent = $userAgentService->getEmulatorUserAgent($this->userAgent);
                 if (!$emulatorUserAgent || !$emulatorUserAgent->pending_minimum_hardcore_version_at) {
@@ -507,7 +531,7 @@ class GetAchievementSetsAction extends BaseAuthenticatedApiAction
             } else {
                 $title = match ($this->clientSupportLevel) {
                     ClientSupportLevel::Outdated => 'Warning: Outdated Emulator (please update)',
-                    ClientSupportLevel::SoftcoreOnly => 'Warning: Softcore Only',
+                    ClientSupportLevel::CasualOnly => 'Warning: Casual Only',
                     ClientSupportLevel::Unsupported => 'Warning: Unsupported Emulator',
                     default => 'Warning: Unknown Emulator',
                 };

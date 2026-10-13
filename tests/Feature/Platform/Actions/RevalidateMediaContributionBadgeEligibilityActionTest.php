@@ -69,6 +69,27 @@ it('awards a tier 0 badge when eligible screenshots cross the first threshold', 
     );
 });
 
+it('keeps exactly one mediaContrib row when upgrading across multiple thresholds', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(100, $game, $submitter, $reviewer);
+
+    // ACT
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect($badge->award_key)->toEqual(2);
+    expect($badge->award_tier)->toEqual(2);
+    expect(
+        PlayerBadge::where('user_id', $submitter->id)
+            ->where('award_type', AwardType::MediaContribution)
+            ->count()
+    )->toEqual(1);
+});
+
 it('excludes self-approved screenshots from the eligible count', function () {
     // ARRANGE
     $game = Game::factory()->create(['system_id' => System::factory()]);
@@ -131,7 +152,7 @@ it('removes existing badges and returns null when no screenshots are eligible', 
         'user_id' => $submitter->id,
         'award_type' => AwardType::MediaContribution,
         'award_key' => 1,
-        'award_tier' => 0,
+        'award_tier' => 1,
     ]);
 
     // ACT
@@ -178,7 +199,40 @@ it('reuses an existing badge at the expected tier without dispatching an event',
     Event::assertNotDispatched(SiteBadgeAwarded::class);
 });
 
-it('downgrades by deleting higher tiers and returning the matching lower tier', function () {
+it('downgrades the existing row in place when eligibility drops to a lower tier', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(10, $game, $submitter, $reviewer);
+
+    $existing = PlayerBadge::factory()->create([
+        'user_id' => $submitter->id,
+        'award_type' => AwardType::MediaContribution,
+        'award_key' => 1,
+        'award_tier' => 1,
+    ]);
+
+    Event::fake([SiteBadgeAwarded::class]);
+
+    // ACT
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect($badge->id)->toEqual($existing->id);
+    expect($badge->award_key)->toEqual(0);
+    expect($badge->award_tier)->toEqual(0);
+    expect(
+        PlayerBadge::where('user_id', $submitter->id)
+            ->where('award_type', AwardType::MediaContribution)
+            ->count()
+    )->toEqual(1);
+
+    Event::assertNotDispatched(SiteBadgeAwarded::class);
+});
+
+it('clears display_award_tier on downgrade when the displayed tier is no longer earned', function () {
     // ARRANGE
     $game = Game::factory()->create(['system_id' => System::factory()]);
     $submitter = User::factory()->create();
@@ -189,29 +243,41 @@ it('downgrades by deleting higher tiers and returning the matching lower tier', 
     PlayerBadge::factory()->create([
         'user_id' => $submitter->id,
         'award_type' => AwardType::MediaContribution,
-        'award_key' => 0,
-        'award_tier' => 0,
+        'award_key' => 2,
+        'award_tier' => 2,
+        'display_award_tier' => 2,
     ]);
-    PlayerBadge::factory()->create([
-        'user_id' => $submitter->id,
-        'award_type' => AwardType::MediaContribution,
-        'award_key' => 1,
-        'award_tier' => 0,
-    ]);
-
-    Event::fake([SiteBadgeAwarded::class]);
 
     // ACT
     $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
 
     // ASSERT
-    expect($badge->award_key)->toEqual(0);
-    expect(PlayerBadge::where('user_id', $submitter->id)
-        ->where('award_type', AwardType::MediaContribution)
-        ->where('award_key', 1)
-        ->count())->toEqual(0);
+    expect($badge->award_tier)->toEqual(0);
+    expect($badge->display_award_tier)->toBeNull();
+});
 
-    Event::assertNotDispatched(SiteBadgeAwarded::class);
+it('preserves display_award_tier on downgrade when the displayed tier is still earned', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(30, $game, $submitter, $reviewer);
+
+    PlayerBadge::factory()->create([
+        'user_id' => $submitter->id,
+        'award_type' => AwardType::MediaContribution,
+        'award_key' => 2,
+        'award_tier' => 2,
+        'display_award_tier' => 0,
+    ]);
+
+    // ACT
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect($badge->award_tier)->toEqual(1);
+    expect($badge->display_award_tier)->toEqual(0);
 });
 
 it('preserves the order_column from the previous highest tier when upgrading', function () {
@@ -407,3 +473,298 @@ it('revalidates the original game when an achievement moves away from submitted 
             ->award_key
     )->toEqual(0);
 });
+
+it('retains media contribution credit when a different capturer replaces the screenshot', function () {
+    // ARRANGE
+    $otherGame = Game::factory()->create(['system_id' => System::factory()]);
+    $sharedGame = Game::factory()->create(['system_id' => System::factory()]);
+    $originalCapturer = User::factory()->create();
+    $replacementCapturer = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(9, $otherGame, $originalCapturer, $reviewer);
+
+    $originalTitle = GameScreenshot::factory()
+        ->for($sharedGame)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $originalCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($originalCapturer);
+    expect($badge?->award_key)->toEqual(0);
+
+    $originalTitle->update([
+        'status' => GameScreenshotStatus::Replaced,
+        'replaced_by_user_id' => $replacementCapturer->id,
+    ]);
+
+    GameScreenshot::factory()
+        ->for($sharedGame)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $replacementCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    // ACT
+    $revalidated = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($originalCapturer);
+
+    // ASSERT
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($originalCapturer)->count())->toEqual(10);
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($replacementCapturer)->count())->toEqual(1);
+    expect($revalidated?->award_key)->toEqual(0);
+    expect(
+        PlayerBadge::where('user_id', $originalCapturer->id)
+            ->where('award_type', AwardType::MediaContribution)
+            ->sole()
+            ->award_key
+    )->toEqual(0);
+});
+
+it('does not stack credit when the same capturer replaces their own screenshot', function () {
+    // ARRANGE
+    $otherGame = Game::factory()->create(['system_id' => System::factory()]);
+    $titleGame = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(9, $otherGame, $submitter, $reviewer);
+
+    $originalTitle = GameScreenshot::factory()
+        ->for($titleGame)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $submitter->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+    expect($badge?->award_key)->toEqual(0);
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($submitter)->count())->toEqual(10);
+
+    $originalTitle->update([
+        'status' => GameScreenshotStatus::Replaced,
+        'replaced_by_user_id' => $submitter->id,
+    ]);
+
+    GameScreenshot::factory()
+        ->for($titleGame)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $submitter->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    // ACT
+    $revalidated = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($submitter)->count())->toEqual(10);
+    expect($revalidated?->award_key)->toEqual(0);
+});
+
+it('retains replaced ingame credit when the capturer has approved siblings', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $originalCapturer = User::factory()->create();
+    $replacementCapturer = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    $replaced = GameScreenshot::factory()
+        ->for($game)
+        ->ingame()
+        ->create([
+            'captured_by_user_id' => $originalCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Replaced,
+            'replaced_by_user_id' => $replacementCapturer->id,
+        ]);
+
+    GameScreenshot::factory()
+        ->for($game)
+        ->ingame()
+        ->create([
+            'captured_by_user_id' => $originalCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    GameScreenshot::factory()
+        ->for($game)
+        ->ingame()
+        ->create([
+            'captured_by_user_id' => $replacementCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    // ACT
+    $eligibleScreenshots = GameScreenshot::query()
+        ->eligibleForMediaContributionBy($originalCapturer)
+        ->where('game_id', $game->id)
+        ->get();
+
+    // ASSERT
+    expect($eligibleScreenshots)->toHaveCount(2);
+    expect($eligibleScreenshots->pluck('id'))->toContain($replaced->id);
+});
+
+it('only credits the final screenshot in a self-replacement chain', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $originalCapturer = User::factory()->create();
+    $replacementCapturer = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    $first = GameScreenshot::factory()
+        ->for($game)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $originalCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Replaced,
+            'replaced_by_user_id' => $originalCapturer->id,
+        ]);
+
+    $second = GameScreenshot::factory()
+        ->for($game)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $originalCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Replaced,
+            'replaced_by_user_id' => $replacementCapturer->id,
+        ]);
+
+    GameScreenshot::factory()
+        ->for($game)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $replacementCapturer->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Approved,
+        ]);
+
+    // ACT
+    $eligibleScreenshots = GameScreenshot::query()
+        ->eligibleForMediaContributionBy($originalCapturer)
+        ->where('game_id', $game->id)
+        ->get();
+
+    // ASSERT
+    expect($eligibleScreenshots)->toHaveCount(1);
+    expect($eligibleScreenshots->pluck('id'))->toContain($second->id);
+    expect($eligibleScreenshots->pluck('id'))->not->toContain($first->id);
+});
+
+it('credits legacy replaced screenshots without replacement attribution', function () {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    $legacyScreenshot = GameScreenshot::factory()
+        ->for($game)
+        ->title()
+        ->create([
+            'captured_by_user_id' => $submitter->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => GameScreenshotStatus::Replaced,
+        ]);
+
+    // ACT
+    $eligibleScreenshots = GameScreenshot::query()
+        ->eligibleForMediaContributionBy($submitter)
+        ->where('game_id', $game->id)
+        ->get();
+
+    // ASSERT
+    expect($eligibleScreenshots->pluck('id'))->toContain($legacyScreenshot->id);
+});
+
+it('excludes non-creditable screenshot statuses from the eligible count', function (
+    GameScreenshotStatus $status,
+) {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    createApprovedScreenshotsForRevalidateActionTest(9, $game, $submitter, $reviewer);
+
+    GameScreenshot::factory()
+        ->for($game)
+        ->ingame()
+        ->create([
+            'captured_by_user_id' => $submitter->id,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+            'status' => $status,
+        ]);
+
+    // ACT
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($submitter)->count())->toEqual(9);
+    expect($badge)->toBeNull();
+})->with([
+    'rejected' => [GameScreenshotStatus::Rejected],
+    'pending' => [GameScreenshotStatus::Pending],
+]);
+
+it('excludes replaced screenshots when the capturer is disqualified on the game', function (
+    string $disqualifier,
+) {
+    // ARRANGE
+    $game = Game::factory()->create(['system_id' => System::factory()]);
+    $submitter = User::factory()->create();
+    $reviewer = User::factory()->create();
+
+    if ($disqualifier === 'claim') {
+        AchievementSetClaim::factory()->create([
+            'game_id' => $game->id,
+            'user_id' => $submitter->id,
+        ]);
+    }
+
+    createApprovedScreenshotsForRevalidateActionTest(10, $game, $submitter, $reviewer);
+
+    GameScreenshot::query()
+        ->where('captured_by_user_id', $submitter->id)
+        ->where('game_id', $game->id)
+        ->update(['status' => GameScreenshotStatus::Replaced]);
+
+    if ($disqualifier === 'achievement') {
+        Achievement::withoutEvents(fn () => Achievement::factory()->for($game)->create([
+            'user_id' => $submitter->id,
+        ]));
+    }
+
+    // ACT
+    $badge = (new RevalidateMediaContributionBadgeEligibilityAction())->execute($submitter);
+
+    // ASSERT
+    expect(GameScreenshot::query()->eligibleForMediaContributionBy($submitter)->count())->toEqual(0);
+    expect($badge)->toBeNull();
+})->with([
+    'authored an achievement' => ['achievement'],
+    'holds an active claim' => ['claim'],
+]);

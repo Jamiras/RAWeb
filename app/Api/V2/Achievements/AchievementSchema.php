@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Api\V2\Achievements;
 
+use App\Api\V2\Tickets\TicketStateFilter;
+use App\Api\V2\Tickets\TicketTypeFilter;
+use App\Api\V2\Tickets\UserUlidFilter;
 use App\Models\Achievement;
-use App\Models\System;
 use Illuminate\Database\Eloquent\Builder;
 use LaravelJsonApi\Eloquent\Contracts\Paginator;
 use LaravelJsonApi\Eloquent\Fields\DateTime;
@@ -20,6 +22,7 @@ use LaravelJsonApi\Eloquent\Filters\WhereIdIn;
 use LaravelJsonApi\Eloquent\Filters\WhereIn;
 use LaravelJsonApi\Eloquent\Pagination\PagePagination;
 use LaravelJsonApi\Eloquent\Schema;
+use LaravelJsonApi\OpenApiSpec\Eloquent\Fields\Integer;
 
 class AchievementSchema extends Schema
 {
@@ -58,8 +61,8 @@ class AchievementSchema extends Schema
             Str::make('title')->sortable()->readOnly(),
             Str::make('description')->readOnly(),
 
-            Number::make('points')->sortable()->readOnly(),
-            Number::make('pointsWeighted', 'points_weighted')->sortable()->readOnly(),
+            Integer::make('points')->sortable()->readOnly(),
+            Integer::make('pointsWeighted', 'points_weighted')->sortable()->readOnly(),
 
             Str::make('badgeUrl')->readOnly(),
             Str::make('badgeLockedUrl')->readOnly(),
@@ -68,12 +71,17 @@ class AchievementSchema extends Schema
 
             Str::make('state')->readOnly(),
 
-            Number::make('orderColumn')->sortable()->readOnly(),
+            Integer::make('orderColumn')->sortable()->readOnly(),
 
-            Number::make('unlocksTotal', 'unlocks_total')->sortable()->readOnly(),
-            Number::make('unlocksHardcore', 'unlocks_hardcore')->sortable()->readOnly(),
+            Integer::make('unlocksTotal', 'unlocks_total')->sortable()->readOnly(),
+            Integer::make('unlocksHardcore', 'unlocks_hardcore')->sortable()->readOnly(),
             Number::make('unlockPercentage', 'unlock_percentage')->sortable()->readOnly(),
             Number::make('unlockHardcorePercentage', 'unlock_hardcore_percentage')->sortable()->readOnly(),
+
+            Integer::make('medianTimeToUnlockSeconds', 'median_time_to_unlock')->readOnly(),
+            Integer::make('medianTimeToUnlockHardcoreSeconds', 'median_time_to_unlock_hardcore')->readOnly(),
+            Integer::make('medianTimeToUnlockSamples', 'median_time_to_unlock_samples')->readOnly(),
+            Integer::make('medianTimeToUnlockHardcoreSamples', 'median_time_to_unlock_hardcore_samples')->readOnly(),
 
             DateTime::make('createdAt', 'created_at')->readOnly(),
             DateTime::make('modifiedAt', 'modified_at')->readOnly(),
@@ -84,6 +92,16 @@ class AchievementSchema extends Schema
             HasMany::make('comments', 'visibleComments')->type('comments')->cannotEagerLoad()->readOnly(),
             HasMany::make('games')->type('games')->readOnly(),
             HasMany::make('playerAchievements')->type('player-achievements')->cannotEagerLoad()->readOnly(),
+            HasMany::make('tickets')
+                ->type('tickets')
+                ->cannotEagerLoad()
+                ->withFilters(
+                    new TicketStateFilter(),
+                    new TicketTypeFilter(),
+                    new UserUlidFilter('reporterUserId', 'reporter_id'),
+                    new UserUlidFilter('resolverUserId', 'resolver_id'),
+                )
+                ->readOnly(),
 
             // TODO add relationships
             // - activeMaintainer (HasOne AchievementMaintainer)
@@ -92,6 +110,36 @@ class AchievementSchema extends Schema
             // - /achievements/{id}/achievementSet
             // - /achievements/{id}/games
             // - /achievements/{id}/developer
+        ];
+    }
+
+    /**
+     * Which attributes can be null in a response.
+     *
+     * @return array<string, bool>
+     */
+    public function attributeNullability(): array
+    {
+        return [
+            'title' => false,
+            'description' => false,
+            'points' => false,
+            'pointsWeighted' => false,
+            'badgeUrl' => false,
+            'badgeLockedUrl' => false,
+            'type' => true,
+            'state' => false,
+            'orderColumn' => true,
+            'unlocksTotal' => true,
+            'unlocksHardcore' => true,
+            'unlockPercentage' => true,
+            'unlockHardcorePercentage' => true,
+            'medianTimeToUnlockSeconds' => true,
+            'medianTimeToUnlockHardcoreSeconds' => true,
+            'medianTimeToUnlockSamples' => true,
+            'medianTimeToUnlockHardcoreSamples' => true,
+            'createdAt' => false,
+            'modifiedAt' => false,
         ];
     }
 
@@ -127,9 +175,8 @@ class AchievementSchema extends Schema
      */
     public function indexQuery(?object $model, Builder $query): Builder
     {
-        // Exclude hub and event game achievements via the game relationship.
-        $query->whereHas('game', fn (Builder $gameQuery) => $gameQuery
-            ->whereNotIn('system_id', [System::Hubs, System::Events]));
+        // Exclude achievements belonging to hub, event, or soft-deleted games.
+        $query->whereFromRealGame();
 
         // Default to promoted only if no state filter is applied.
         // The filter will override this if explicitly set.

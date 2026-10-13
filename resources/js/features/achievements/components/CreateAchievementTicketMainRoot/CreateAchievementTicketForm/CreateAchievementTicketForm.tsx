@@ -10,6 +10,7 @@ import {
 import { BaseButton } from '@/common/components/+vendor/BaseButton';
 import { BaseForm } from '@/common/components/+vendor/BaseForm';
 import { usePageProps } from '@/common/hooks/usePageProps';
+import { shouldTicketTypeOfferManualUnlock } from '@/features/achievements/utils/shouldTicketTypeOfferManualUnlock';
 
 import { DescriptionField } from './DescriptionField';
 import { EmulatorCoreField } from './EmulatorCoreField';
@@ -18,6 +19,7 @@ import { EmulatorVersionField } from './EmulatorVersionField';
 import { GameHashSelectField } from './GameHashSelectField';
 import { IssueSelectField } from './IssueSelectField';
 import { SessionModeToggleGroup } from './SessionModeToggleGroup';
+import { TicketSubmittedPanel } from './TicketSubmittedPanel';
 import { useCreateAchievementTicketForm } from './useCreateAchievementTicketForm';
 
 export const CreateAchievementTicketForm: FC = () => {
@@ -44,7 +46,7 @@ export const CreateAchievementTicketForm: FC = () => {
     ),
     mode: getDefaultSelectedMode(selectedMode, {
       hardcore: auth!.user.points,
-      softcore: auth!.user.pointsSoftcore,
+      casual: auth!.user.pointsSoftcore,
     }),
     core: emulatorCore ?? '',
     description: '',
@@ -52,6 +54,10 @@ export const CreateAchievementTicketForm: FC = () => {
 
   const issue = useWatch({ name: 'issue', control: form.control });
   const description = useWatch({ name: 'description', control: form.control });
+
+  if (mutation.isSuccess && shouldTicketTypeOfferManualUnlock(mutation.variables.payload.issue)) {
+    return <TicketSubmittedPanel ticketId={mutation.data.data.ticketId} />;
+  }
 
   return (
     <BaseForm {...form}>
@@ -70,6 +76,12 @@ export const CreateAchievementTicketForm: FC = () => {
 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex flex-col gap-7 md:gap-4">
+          <p className="text-neutral-300 light:text-neutral-700">
+            {t(
+              'A ticket tells the developer about the bug. It does not add the achievement to your profile.',
+            )}
+          </p>
+
           <IssueSelectField />
           <EmulatorSelectField />
           <EmulatorVersionField />
@@ -141,18 +153,18 @@ function getDefaultGameHashId(
 
 function getDefaultSelectedMode(
   selectedMode: number | null,
-  currentUserPoints: { hardcore: number; softcore: number },
-): 'hardcore' | 'softcore' | undefined {
+  currentUserPoints: { hardcore: number; casual: number },
+): 'hardcore' | 'casual' | undefined {
   if (selectedMode === 1) return 'hardcore';
-  if (selectedMode === 0) return 'softcore';
+  if (selectedMode === 0) return 'casual';
 
-  const hasNoPoints = !currentUserPoints.hardcore && !currentUserPoints.softcore;
-  const hasEqualPoints = currentUserPoints.hardcore === currentUserPoints.softcore;
+  const hasNoPoints = !currentUserPoints.hardcore && !currentUserPoints.casual;
+  const hasEqualPoints = currentUserPoints.hardcore === currentUserPoints.casual;
   if (hasNoPoints || hasEqualPoints) {
     return;
   }
 
-  return currentUserPoints.hardcore >= currentUserPoints.softcore ? 'hardcore' : 'softcore';
+  return currentUserPoints.hardcore >= currentUserPoints.casual ? 'hardcore' : 'casual';
 }
 
 function getDefaultIssueValueFromTypeParameter(

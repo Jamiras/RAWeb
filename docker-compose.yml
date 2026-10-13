@@ -66,18 +66,6 @@ services:
             test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
             retries: 3
             timeout: 5s
-    phpmyadmin:
-        image: phpmyadmin/phpmyadmin
-        environment:
-            PMA_ARBITRARY: 1
-            PMA_HOST: mariadb
-            PMA_USER: '${DB_USERNAME}'
-            PMA_PASSWORD: '${DB_PASSWORD}'
-            PMA_PORT: 3306
-        ports:
-            - '${FORWARD_PHPMYADMIN_PORT:-8081}:80'
-        networks:
-            - raweb
     meilisearch:
         image: 'getmeili/meilisearch:latest'
         ports:
@@ -107,7 +95,7 @@ services:
         networks:
             - raweb
     minio:
-        image: 'minio/minio:RELEASE.2025-04-08T15-41-24Z' # later versions remove the admin UI
+        image: 'pgsty/minio:RELEASE.2026-08-04T00-00-00Z'
         ports:
             - '${FORWARD_MINIO_PORT:-9000}:9000'
             - '${FORWARD_MINIO_CONSOLE_PORT:-8900}:8900'

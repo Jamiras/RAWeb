@@ -14,8 +14,8 @@ import {
 } from '@/common/components/+vendor/BaseAlertDialog';
 import { BaseButton } from '@/common/components/+vendor/BaseButton';
 import { buildTrackingClassNames } from '@/common/utils/buildTrackingClassNames';
+import { buildStructuredMessage } from '@/features/achievements/utils/buildStructuredMessage';
 
-import { buildStructuredMessage } from '../buildStructuredMessage';
 import { ReportIssueOptionItem } from '../ReportIssueOptionItem';
 
 interface ReportToDeveloperComplianceListItemProps {
@@ -39,7 +39,7 @@ export const ReportToDeveloperComplianceListItem: FC<ReportToDeveloperCompliance
   return (
     <>
       {achievement.game?.isSubsetGame ? (
-        <li className="flex w-full flex-col items-center justify-between gap-2 rounded bg-embed px-3 py-2 sm:flex-row">
+        <li className="flex w-full flex-col items-center justify-between gap-2 rounded-sm bg-embed px-3 py-2 sm:flex-row">
           <p>
             <Trans
               i18nKey="The achievement contains an <1>unwelcome concept</1>."
